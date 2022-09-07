@@ -17,12 +17,12 @@ citEntry(entry = "Article",
         "URL: https://doi.org/10.1016/j.spasta.2018.07.005."))
 
 citEntry(entry = "Article",
-  title        = "spGARCH: An R-Package for Spatial and Spatiotemporal ARCH and GARCH models",
+  title        = "spGARCH: An R-Package for Spatial and Spatiotemporal ARCH models",
   author       = personList(as.person("Philipp Otto")),
   journal      = "To appear: The R Journal",
   year         = "2019",
   textVersion  =
   paste("Otto, P. (2019).",
-        "spGARCH: An R-Package for Spatial and Spatiotemporal ARCH and GARCH models",
+        "spGARCH: An R-Package for Spatial and Spatiotemporal ARCH models",
         "To appear: The R Journal",
         "URL: https://arxiv.org/abs/1812.01871"))
