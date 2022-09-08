@@ -62,7 +62,7 @@ The functions returns a vector \eqn{\boldsymbol{y}}{y}.
 Philipp Otto, Wolfgang Schmid, Robert Garthoff (2018). Generalised Spatial and Spatiotemporal Autoregressive Conditional Heteroscedasticity. \href{https://doi.org/10.1016/j.spasta.2018.07.005}{Spatial Statistics} 26, pp. 125-145. \emph{arXiv:1609.00711}
 }
 \author{
-Philipp Otto \email{potto@europa-uni.de}
+Philipp Otto \email{Philipp.Otto@ikg.uni-hannover.de}
 }
 \section{Control Arguments}{
 \itemize{

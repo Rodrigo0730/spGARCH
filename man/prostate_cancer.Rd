@@ -37,8 +37,9 @@ The dataset contains logarithmic incidence rates from the National Cancer Instit
 National Cancer Institute, Centers for Disease, Control and Prevention
 }
 \references{
+State Cancer Profiles, Interactive Maps: 
 https://statecancerprofiles.cancer.gov/map/map.withimage.php?99&001&001&00&0&02&0&1&10
-Otto, P. (2019). spGARCH: An R-Package for Spatial and Spatiotemporal ARCH and GARCH models To appear: The R Journal URL: https://arxiv.org/abs/1812.01871
+Otto, P. (2019). spGARCH: An R-Package for Spatial and Spatiotemporal ARCH models To appear: The R Journal URL: https://arxiv.org/abs/1812.01871
 }
 \examples{
 data(prostate_cancer)

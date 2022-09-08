@@ -22,7 +22,7 @@ Other arguments.
 Fitted values extracted from the \code{object}.
 }
 \author{
-Philipp Otto \email{potto@europa-uni.de}
+Philipp Otto \email{Philipp.Otto@ikg.uni-hannover.de}
 }
 \seealso{
 \code{\link[spGARCH]{residuals.spARCH}}, \code{\link[spGARCH]{logLik.spARCH}}.
