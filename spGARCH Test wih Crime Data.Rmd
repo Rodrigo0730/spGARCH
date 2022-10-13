@@ -1,0 +1,89 @@
+---
+title: "spGARCH Test wih Crime Data"
+author: "Sizhe Wu"
+date: "2022-10-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Install package 'crimedata'
+
+Download from: https://github.com/mpjashby/crimedata
+
+The goal of crimedata is to access police-recorded crime data from large US cities using the Crime Open Database (CODE), a service that provides these data in a convenient format for analysis. All the data are available to use for free as long as you acknowledge the source of the data.
+
+The function returns a tidy data tibble or simple features (SF) object of crime data with each row representing a single crime. The data provided for each offense includes the offense type, approximate offense location and date/time. More fields are available for some records, depending on what data have been released by each city. For most cities, data are available from 2010 onward, with some available back to 2007. Use to see which years are available for which cities.get_crime_data()list_crime_data()
+
+More detail about what data are available, how they were constructed and the meanings of the different categories can be found on the CODE project website. Further detail is available in the paper Studying Crime and Place with the Crime Open Database.
+
+Data can be downloaded by year and by city. By default (i.e. if no arguments are specified, 'get_crime_data()') a 1% sample of data for all cities for the most recent available year is returned.
+
+```{r}
+#install.packages("crimedata")
+library(crimedata)
+library(tidyverse)
+library(lubridate)
+#help(crimedata)
+
+# To get a sample of 1%. Time period from 2010 to 2017 
+ crime <- get_crime_data(
+   years = 2010:2017,
+   cities = NULL,
+   quiet = TRUE,
+   output = 'sf'
+ )
+ 
+crime_select <- select(crime, 'city_name', 'offense_type', 'offense_group', 'offense_against', 'date_single', 'geometry')
+
+crime.rate_select <- crime_select %>% 
+  mutate(offense_year = year(date_single)) %>%
+  group_by(offense_year,city_name,offense_type) %>%
+  summarise(Incidents = n()) %>%
+  mutate(pct = Incidents/sum(Incidents))
+```
+
+You can alternatively get a simple features (SF) point object with the correct co-ordinates and co-ordinate reference system (CRS) specified by setting the argument output = "sf". This can be used to quickly plot the data.
+For example, to analyze personal robberies in the sample data:
+
+```{r}
+library(ggplot2)
+personal_robberies <- subset(crime, offense_type == "personal robbery")
+subset(crime, offense_type == "personal robbery") %>%
+  mutate(offense_year = year(date_single)) %>%
+  ggplot()+
+  geom_sf()+
+  facet_wrap(vars(offense_year), nrow = 4)
+```
+
+```{r}
+personal_robberies %>% 
+  mutate(offense_year = year(date_single))%>%
+  group_by(offense_year,city_name)%>%
+  summarise(Incidents = n()) %>%
+  mutate(pct = Incidents/sum(Incidents)) -> pr.rate
+```
+
+## Install package 'spGARCH'
+
+The function 'qml.spARCH' fits a spatial ARCH model using the maximum-likelihood approach. In addition, external regressor may be included in the mean equation.
+
+```{r setup}
+install.packages("spGARCH")
+library(spGARCH)
+help(spGARCH)
+```
+
+Test the function with sample crime data. For example, use the US personal robberies.
+
+### How to calculate W for the test data
+```{r}
+
+qml.robberies <- qml.spARCH( pct ~ city_name + offense_year, data = pr.rate
+#, w = ,
+)
+# qml.step <- step(qml.robberies)
+
+```
