@@ -2,7 +2,9 @@
 title: "spGARCH Test wih Crime Data"
 author: "Sizhe Wu"
 date: "2022-10-01"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -36,8 +38,10 @@ library(lubridate)
    output = 'sf'
  )
  
+# Select variables 
 crime_select <- select(crime, 'city_name', 'offense_type', 'offense_group', 'offense_against', 'date_single', 'geometry')
 
+# Calculate the crime rate by offense_year, city and offense_type
 crime.rate_select <- crime_select %>% 
   mutate(offense_year = year(date_single)) %>%
   group_by(offense_year,city_name,offense_type) %>%
@@ -64,6 +68,7 @@ personal_robberies %>%
   group_by(offense_year,city_name)%>%
   summarise(Incidents = n()) %>%
   mutate(pct = Incidents/sum(Incidents)) -> pr.rate
+pr.rate <- pr.rate[!is.na(pr.rate$offense_year),]
 ```
 
 ## Install package 'spGARCH'
@@ -76,14 +81,31 @@ library(spGARCH)
 help(spGARCH)
 ```
 
-Test the function with sample crime data. For example, use the US personal robberies.
 
-### How to calculate W for the test data
+### Calculate weighing matrix W for the test data
+
+'spdep' is a collection of functions to create spatial weights matrix objects.
+
+```{r}
+library(sf)
+#install.packages("spdep")
+library(spdep)
+coords <- st_centroid(st_geometry(pr.rate), of_largest_polygon=TRUE,na.rm = TRUE)
+
+# choose K nearest neighbours for spatial weights
+col.knn <- knearneigh(coords, k=3)
+st_geometry(pr.rate)
+nblist <- knn2nb(col.knn)
+W <- nb2mat(nblist)
+
+```
+
+### Test the function with sample crime data. For example, use the US personal robberies.
+
 ```{r}
 
-qml.robberies <- qml.spARCH( pct ~ city_name + offense_year, data = pr.rate
-#, w = ,
-)
-# qml.step <- step(qml.robberies)
+qml.robberies <- qml.spARCH( pct ~ city_name + offense_year, data = pr.rate, W = W)
+qml.step <- step(qml.robberies)
+summary(qml.step)
 
 ```
