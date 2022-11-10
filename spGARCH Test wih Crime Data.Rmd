@@ -337,7 +337,7 @@ boroughWestminster             0.01871058         NA      NA       NA
  Moran's I (squared residuals): -0.035261, p-value: 0.97046
 
 
-### 2.5 Appending some other possible factor of 'London Crime'
+### 2.5 Append some other possible factors to 'London Crime'
 
 Download the Data set 'housing density':
 https://data.london.gov.uk/dataset/land-area-and-population-density-ward-and-borough
