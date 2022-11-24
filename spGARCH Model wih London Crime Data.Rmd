@@ -1,0 +1,204 @@
+---
+title: "spGARCH model with London Crime Dataset"
+author: "Sizhe Wu"
+date: "2022-11-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. London Crime Dataset
+
+### 1.1 Load dataset 'London Crime Rate'
+
+Original Data Set download from Kaggle:
+https://www.kaggle.com/datasets/jboysen/london-crime?resource=download
+
+The objects in 'LondonCrimeRate.RData' includes annual incidents of 9 major crime categories from 2008 to 2016 in 33 London boroughs. To see more details about monthly incidents or minor categories, please download the original data set.
+
+The annual population density is attached by variable 'london'. Original Data set download from: 'housing density':
+https://data.london.gov.uk/dataset/land-area-and-population-density-ward-and-borough
+
+
+```{r}
+library(tidyverse)
+
+# Load objects in LondonCrimeRate.RData into workspace
+load(file = "data/LondonCrimeRate.RData")
+
+# list of 33 boroughs
+unique(london_crime.rate$borough)
+
+# view the data set london_crime.rate
+view(london_crime.rate)
+```
+
+### 1.2 Use London geometry information to calculate the weighting matrix W
+
+The shape file for London boroughs is download from:
+https://data.london.gov.uk/dataset/statistical-gis-boundary-files-london
+
+The geometry information is needed to calculate the weighting matrix 'W'
+
+```{r}
+library(spdep)
+load(file = 'data/LondonMap.RData')
+
+# choose K nearest neighbours for spatial weights
+col.knn <- knearneigh(centroids, k = 3)
+nblist <- knn2nb(col.knn)
+W <- nb2mat(nblist)
+
+nb_object <- poly2nb(london_map)
+W <- nb2mat(nb_object, style = "W")
+
+image(W)
+apply(W, 1, sum)
+```
+
+### 1.3 Take logarithms of incidents
+
+
+
+```{r}
+london_crime.rate <- london_crime.rate %>% 
+  group_by(borough, year,major_category) %>%
+  mutate(log.Incidents = log(Incidents))
+
+london_crime.rate <- london_crime.rate %>% 
+  group_by(borough, major_category) %>%
+  mutate(log.diff = log.Incidents - lag(log.Incidents))
+
+```
+
+## 2. Multiple dimenssion qml Model Test
+
+```{r}
+qml_vec_spARCH <- function(Y, W, parameters){
+
+  dimY <- dim(Y)
+
+  n    <- dimY[1]
+
+  p    <- dimY[2]
+
+  t    <- dimY[3]
+
+  dimW <- dim(W)
+
+  if(dimW[1] != n | dimW[2] != n){
+
+    stop("Dimension of W is wrong")
+
+  }
+
+
+  if(parameters$errortype == "norm"){
+
+    E_logsq_errors <- (digamma(1) - log(2))
+
+    lnsig_u        <-  4.934 # var(logsq(rnorm(50000000)))
+
+  } else if (parameters$errortype == "t"){
+
+    E_logsq_errors <- -0.901 # mean(logsq(rt(50000000, 3)))
+
+    lnsig_u        <-  5.870 # var(logsq(rt(50000000, 3)))
+
+  }
+
+
+  logsq <- function(x){
+
+    return(log(x^2))
+
+  }
+
+
+  logsq_back <- function(x, sgn){
+
+    return(sgn*sqrt(exp(x)))
+
+  }
+
+
+  vec <- function(x){
+
+    return(as.vector(x))
+
+  }
+
+
+  LogLikelihood <- function(pars, Y, W, lnsig_u){
+
+
+    dimY <- dim(Y)
+
+    n    <- dimY[1]
+
+    p    <- dimY[2]
+
+    t    <- dimY[3] 
+
+
+    A_tilde <- pars[1] * matrix(rep(1, n*p), n, p)
+
+    Psi     <- matrix(pars[2:(p^2+1)], p, p) 
+
+    Pi      <- matrix(pars[(p^2+2):(2*p^2+1)], p, p) 
+
+
+    S         <- diag(n*p) - t(Psi) %x% W
+
+    log_det_S <- determinant(S, logarithm = TRUE)$modulus
+
+
+    sum_eps_2 <- 0
+
+    for(i.t in 2:t){
+
+      vec_u_t   <- S %*% vec(logsq(Y[,,i.t])) - vec(A_tilde) - (diag(p) %x% logsq(Y[,,i.t-1])) %*% vec(Pi)
+
+      sum_eps_2 <- sum_eps_2 + sum(vec_u_t^2)
+
+    }
+
+    
+
+    LL <- -1/2 * log(2*pi) + (n * lnsig_u) / (2*p) + (t-1)/(n*p) * log_det_S - 1/(2*n*p*lnsig_u) * sum_eps_2
+
+    
+
+    return((-1) * LL) # ((t-1)*n*p) *
+
+  }
+
+
+  start_a   <- 1
+
+  start_Psi <- matrix(c(0.5, 0.1, 0.1, 0.5), 2, 2) 
+
+  start_Pi  <- matrix(c(0.3, 0, 0, 0.3), 2, 2) 
+
+
+  start_pars <- c(start_a, vec(start_Psi), vec(start_Pi))
+
+
+  out <- solnp(start_pars, fun = LogLikelihood, Y = Y, W = W, lnsig_u = lnsig_u, control = list(trace = FALSE)) # , eqfun = constraint, eqB = 0)
+  
+
+  A_est         <- (out$pars[1] - E_logsq_errors) * matrix(rep(1, n*p), n, p)
+
+  Psi_est       <- matrix(out$pars[2:(p^2+1)], p, p) 
+
+  Pi_est        <- matrix(out$pars[(p^2+2):(2*p^2+1)], p, p) 
+
+  
+  return(list(A_est = A_est, Psi_est = Psi_est, Pi_est = Pi_est, H = out$hessian, ll = out$values[length(out$values)]))
+
+}
+```
+
+
