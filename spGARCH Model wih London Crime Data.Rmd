@@ -47,10 +47,13 @@ library(spdep)
 load(file = 'data/LondonMap.RData')
 
 # choose K nearest neighbours for spatial weights
-col.knn <- knearneigh(centroids, k = 3)
-nblist <- knn2nb(col.knn)
-W <- nb2mat(nblist)
+#col.knn <- knearneigh(centroids, k = 3)
+#nblist <- knn2nb(col.knn)
+#nblist <- nblist[-33]
+#W <- nb2mat(nblist)
 
+
+london_map <- subset(london_map, NAME != "City of London")
 nb_object <- poly2nb(london_map)
 W <- nb2mat(nb_object, style = "W")
 
@@ -59,8 +62,6 @@ apply(W, 1, sum)
 ```
 
 ### 1.3 Take logarithms of incidents
-
-
 
 ```{r}
 london_crime.rate <- london_crime.rate %>% 
@@ -71,7 +72,27 @@ london_crime.rate <- london_crime.rate %>%
   group_by(borough, major_category) %>%
   mutate(log.diff = log.Incidents - lag(log.Incidents))
 
+unique(london_crime.rate$major_category)
+crime <- subset(london_crime.rate, borough != 'City of London' & major_category != 'Sexual Offences' & major_category != 'Fraud or Forgery')
+crime <- array(london_crime.rate$log.diff, dim = c(32,9,7))
+crime <- aperm(crime,c(1,3,2))
 ```
+
+
+### Visualization
+
+```{r}
+library(ggplot2)
+
+data <- subset(london_crime.rate, year == '2008')
+map <- ggplot() +
+    geom_sf(data = london_map, mapping = aes(fill = NAME), show.legend = FALSE)
+
+map +
+  geom_point(data=data, mapping=aes(map_id = borough))
+  facet_wrap(major_category, nrow = 2)
+```
+
 
 ## 2. Multiple dimenssion qml Model Test
 
@@ -200,5 +221,11 @@ qml_vec_spARCH <- function(Y, W, parameters){
 
 }
 ```
+
+```{r}
+qml_vec_spARCH(crime, W, parameters = )
+
+```
+
 
 
