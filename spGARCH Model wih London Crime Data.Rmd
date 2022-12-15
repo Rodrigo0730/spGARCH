@@ -72,31 +72,55 @@ london_crime.rate <- london_crime.rate %>%
   group_by(borough, major_category) %>%
   mutate(log.diff = log.Incidents - lag(log.Incidents))
 
+# Drop the NA of data set, for borough 'City of London' and crime category 'Sexual Offences', 'Fraud or Forgery' there are all NA
 unique(london_crime.rate$major_category)
-crime <- subset(london_crime.rate, borough != 'City of London' & major_category != 'Sexual Offences' & major_category != 'Fraud or Forgery')
-crime <- array(london_crime.rate$log.diff, dim = c(32,9,7))
+tmp <- subset(london_crime.rate, borough != 'City of London' & major_category != 'Sexual Offences' & major_category != 'Fraud or Forgery' & year != 2008)
+```
+
+```{r}
+crime <- array(tmp$log.diff, dim = c(32,8,7),
+               dimnames = list(unique(london_crime.rate$borough[london_crime.rate$borough != 'City of London']),
+                               2009:2016,
+                               unique(london_crime.rate$major_category[london_crime.rate$major_category != 'Sexual Offences' & london_crime.rate$major_category != 'Fraud or Forgery']) ))
+
+# Array Transposition, n * p * t: borough * crime category * time
 crime <- aperm(crime,c(1,3,2))
 ```
 
 
-### Visualization
+## 2. Visualization
 
 ```{r}
 library(ggplot2)
 
-data <- subset(london_crime.rate, year == '2008')
-map <- ggplot() +
-    geom_sf(data = london_map, mapping = aes(fill = NAME), show.legend = FALSE)
+#colnames(london_map)[1] = 'borough'
 
-map +
-  geom_point(data=data, mapping=aes(map_id = borough))
-  facet_wrap(major_category, nrow = 2)
+#crime.map <- merge(london_crime.rate, london_map[c(1,8)], by = "borough", all = TRUE)
+
+#ggplot() +
+#  geom_map(data = tmp, aes(map_id = borough, fill = Incidents), map = london_map) +
+#  geom_path(data = london_map, aes( x = long, y = lat)) +
+#  scale_fill_manual(name = 'Incidents', values = colormap, na.value = 'grey') +
+#  theme_minimal()
+
+colnames(centroids) = c('lon','lat')
+borough = as.array(unique(london_crime.rate$borough))
+cbind(borough,centroids)  
+crime.map <- merge(london_crime.rate,cbind(borough,centroids) , by = "borough", all = TRUE)
+
+#ggplot() + 
+#  geom_sf(data = london_map) + 
+#  geom_point(data = crime.map, mapping = aes(x = lon, y = lat, fill = Incidents)) 
+
+
 ```
 
 
-## 2. Multiple dimenssion qml Model Test
+
+## 3. Multiple dimenssion qml Model Test
 
 ```{r}
+
 qml_vec_spARCH <- function(Y, W, parameters){
 
   dimY <- dim(Y)
@@ -151,7 +175,7 @@ qml_vec_spARCH <- function(Y, W, parameters){
 
   }
 
-
+# for 'norm' type, lnsig_u <- 4.934
   LogLikelihood <- function(pars, Y, W, lnsig_u){
 
 
@@ -223,7 +247,11 @@ qml_vec_spARCH <- function(Y, W, parameters){
 ```
 
 ```{r}
-qml_vec_spARCH(crime, W, parameters = )
+library("Rsolnp")
+
+qml_vec_spARCH(crime, W, parameters = list(errortype = "norm"))
+
+
 
 ```
 
