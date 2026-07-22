@@ -3,39 +3,26 @@ using namespace Rcpp;
 using namespace Eigen;
 
 // [[Rcpp::export(".Simulation_CPP")]]
-Eigen::VectorXd Simulation_CPP (Eigen::VectorXd eps, Eigen::MappedSparseMatrix<double> Wsparse, double alpha)
+Eigen::VectorXd Simulation_CPP (Eigen::VectorXd eps,
+                                  Eigen::MappedSparseMatrix<double> Wsparse,
+                                  double alpha)
 {
-  // ---------------- //
-  //   Declarations   //
-  // ---------------- //
-
   int n = eps.size();
-  VectorXd eta(n);
-  VectorXd eps_sq(n);
-  VectorXd Y2(n);
-  VectorXd h(n);
-  MatrixXd A(n, n);
-  MatrixXd I_minus_A(n, n);
-  MatrixXd Inverse(n, n);
-  // Identity matrix
-  MatrixXd I(n, n);
-  I.setIdentity(n, n);
 
-  // ---------------- //
-  //   Computations   //
-  // ---------------- //
+  VectorXd eps_sq = eps.array().square();
+  VectorXd eta    = alpha * eps_sq;
 
-  // squared residuals + eta
-  eps_sq = eps.asDiagonal() * eps;
-  eta =  alpha * eps_sq;
+  SparseMatrix<double> A = eps_sq.asDiagonal() * Wsparse;
 
-  // A and inverse of I - A^2
-  A = eps_sq.asDiagonal() * Wsparse;
-  I_minus_A = I - A;
-  Inverse = I_minus_A.inverse();
+  SparseMatrix<double> I_minus_A(n, n);
+  I_minus_A.setIdentity();
+  I_minus_A -= A;
 
-  // h;
-  h =  alpha * VectorXd::Ones(n) + Wsparse * Inverse * eta;
+  SparseLU<SparseMatrix<double>> solver;
+  solver.compute(I_minus_A);
+  VectorXd temp = solver.solve(eta);
+
+  VectorXd h = alpha * VectorXd::Ones(n) + Wsparse * temp;
 
   return h;
 }
