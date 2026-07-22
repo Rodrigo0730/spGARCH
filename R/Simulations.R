@@ -69,21 +69,16 @@ sim.spARCH <- function(n = dim(W)[1], rho, alpha, W, b = 2, type = "spARCH", con
   if (con$silent == FALSE){
     cat("Current random seed: ", con$seed, " (To reproduce the results, add argument 'seed = ", con$seed, "' to control argument) \n", sep = "")
   }
-  if (type == "log-spARCH"){
+  if (type == "log-spARCH") {
     return(.Simulation_CPP_E(eps, W, alpha, b))
-  } else {
-    h <- .Simulation_CPP(eps, W, alpha)
   }
-  if (type == "spARCH"){
+  h <- .Simulation_CPP(eps, W, alpha)
+  if (type == "spARCH") {
     return(as.numeric(sqrt(h) * eps))
   }
-  if (type == "log-spARCH"){
-    return(as.numeric(exp(h) * eps))
-  }
-  if (type == "complex-spARCH"){
+  if (type == "complex-spARCH") {
     return(as.complex(sqrt(as.complex(h)) * eps))
   }
-  stop("invalid type: ", type)
 }
 
 
