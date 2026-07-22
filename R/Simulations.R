@@ -152,21 +152,7 @@ sim.spGARCH <- function(n = dim(W1)[1], rho, lambda, alpha, W1, W2, b = 2, zeta 
 
   alpha     <- alpha * rep(1, n)
 
-  if (type == "spARCH"){
-    if(!con$triangular){
-      eigen_values <- eigen(W1, only.values = TRUE)$values
-      if(any(eigen_values != 0)){
-        a <- 1 / sqrt(sqrt(norm(W1 %*% W1, "1")))
-        eps <- rtruncnorm(n, a = -a, b = a)
-      } else {
-        eps <- rnorm(n)
-      }
-    } else {
-      eps <- rnorm(n)
-    }
-  } else {
-    eps <- rnorm(n)
-  }
+  eps <- rnorm(n)
 
   tau   <- tau_eps(eps, W1, W2, alpha, theta, zeta, b)
   S     <- solve(diag(n) - W2)
