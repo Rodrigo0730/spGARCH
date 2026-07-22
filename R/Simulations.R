@@ -165,7 +165,7 @@ sim.spGARCH <- function(n = dim(W1)[1], rho, lambda, alpha, W1, W2,
   eps <- rnorm(n)
 
   tau   <- tau_eps(eps, W1, W2, alpha, theta, zeta, b)
-  S     <- solve(diag(n) - W2)
+  S     <- Matrix::solve(Matrix::Diagonal(n) - W2)
   X     <- S %*% (alpha + W1 %*% tau)
 
   if(type == "complex-spGARCH"){
@@ -199,7 +199,7 @@ sim.spGARCH <- function(n = dim(W1)[1], rho, lambda, alpha, W1, W2,
     tau_eps <- function(eps, W_1, W_2, alpha, theta, zeta, b){  # function tau in paper
       eps_2 <- eps^2
       n     <- length(eps)
-      return(diag(eps_2) %*% solve(diag(n) - Matrix(W_1) %*% diag(eps_2) - Matrix(W_2)) %*% alpha)
+      return(diag(eps_2) %*% Matrix::solve(Matrix::Diagonal(n) - Matrix(W_1) %*% diag(eps_2) - Matrix(W_2)) %*% alpha)
     }
     tau_y <- function(y){
       return(y^2)
