@@ -86,6 +86,27 @@ sim.spARCH <- function(n = dim(W)[1], rho, alpha, W, b = 2, type = "spARCH",
   }
 }
 
+sim.spARCH_batch <- function(n_sim = 1, ..., seed = NULL, workers = 1) {
+  if (workers > 1) {
+    cl <- parallel::makeCluster(workers)
+    doParallel::registerDoParallel(cl)
+    on.exit(parallel::stopCluster(cl))
+  } else {
+    foreach::registerDoSEQ()
+  }
+
+  if (!is.null(seed)) set.seed(seed)
+
+  `%dorng%` <- doRNG::`%dorng%`
+  i <- NULL
+
+  results <- foreach::foreach(i = seq_len(n_sim), .packages = "spGARCH") %dorng% {
+    sim.spARCH(..., seed = NULL)
+  }
+
+  return(results)
+}
+
 
 sim.spGARCH <- function(n = dim(W1)[1], rho, lambda, alpha, W1, W2,
                        b = 2, zeta = 0.5, theta = 0.5,
@@ -176,6 +197,27 @@ sim.spGARCH <- function(n = dim(W1)[1], rho, lambda, alpha, W1, W2,
 
   return(as.vector(Y))
 
+}
+
+sim.spGARCH_batch <- function(n_sim = 1, ..., seed = NULL, workers = 1) {
+  if (workers > 1) {
+    cl <- parallel::makeCluster(workers)
+    doParallel::registerDoParallel(cl)
+    on.exit(parallel::stopCluster(cl))
+  } else {
+    foreach::registerDoSEQ()
+  }
+
+  if (!is.null(seed)) set.seed(seed)
+
+  `%dorng%` <- doRNG::`%dorng%`
+  i <- NULL
+
+  results <- foreach::foreach(i = seq_len(n_sim), .packages = "spGARCH") %dorng% {
+    sim.spGARCH(..., seed = NULL)
+  }
+
+  return(results)
 }
 
 
