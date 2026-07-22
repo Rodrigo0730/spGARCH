@@ -4,19 +4,33 @@
 #
 ##################################################
 
-
 # spatial ARCH process
 
-
-qml.spARCH <- function(formula, W, type = "spARCH", data = NULL, b = 2, start = NULL, control = list()){
+qml.spARCH <- function(
+  formula,
+  W,
+  type = "spARCH",
+  data = NULL,
+  b = 2,
+  start = NULL,
+  control = list()
+) {
   cl <- match.call()
-  con <- list(trace = FALSE, rho = 1, outer.iter = 400, inner.iter = 800, delta = 1.0e-7, tol = 1.0e-8)
+  con <- list(
+    trace = FALSE,
+    rho = 1,
+    outer.iter = 400,
+    inner.iter = 800,
+    delta = 1.0e-7,
+    tol = 1.0e-8
+  )
   nmsC <- names(con)
   con[(namc <- names(control))] <- control
-  if (length(noNms <- namc[!namc %in% nmsC]))
+  if (length(noNms <- namc[!namc %in% nmsC])) {
     warning("unknown names in control: ", paste(noNms, collapse = ", "))
+  }
 
-  if(!is.element(type, c("spARCH", "log-spARCH"))){
+  if (!is.element(type, c("spARCH", "log-spARCH"))) {
     stop("invalid type: ", type)
   }
 
@@ -25,28 +39,32 @@ qml.spARCH <- function(formula, W, type = "spARCH", data = NULL, b = 2, start = 
   y <- model.response(model_frame)
   X <- model.matrix(model_terms, model_frame)
 
-  if (length(dim(y)) > 0 | !inherits(y, "numeric") | mode(y) != "numeric"){
+  if (length(dim(y)) > 0 | !inherits(y, "numeric") | mode(y) != "numeric") {
     stop("y must be a numeric vector \n")
   }
 
-  if (dim(W)[1] != dim(W)[2]){
+  if (dim(W)[1] != dim(W)[2]) {
     stop("Spatial weight matrix must be quadratic \n")
   }
-  if (length(y) != dim(W)[1]){
-    stop(paste("Spatial weight matrix must have dimension", length(y), "x", length(y), "(length of y) \n"))
+  if (length(y) != dim(W)[1]) {
+    stop(paste(
+      "Spatial weight matrix must have dimension",
+      length(y),
+      "x",
+      length(y),
+      "(length of y) \n"
+    ))
   }
-  if (!inherits(W, "dgCMatrix")){
+  if (!inherits(W, "dgCMatrix")) {
     W <- .asdgCMatrix(as.matrix(W))
   }
 
-  if(is.null(names(y))){
+  if (is.null(names(y))) {
     names(y) <- as.character(1:length(y))
   }
 
-  if (type == "spARCH"){
-
-    if(dim(X)[2] == 0){
-
+  if (type == "spARCH") {
+    if (dim(X)[2] == 0) {
       param <- list(y, W, isSymmetric(W)) # parameters and regressors
 
       LB <- c(1e-6, 0)
@@ -54,13 +72,15 @@ qml.spARCH <- function(formula, W, type = "spARCH", data = NULL, b = 2, start = 
       default <- c(0.4, 1)
       start <- .teststart(start, LB, UB, default)
 
-      snp <- solnp(pars = start, fun = .LL_spARCH, param = param, # .LL_spARCH_oriented_r
-                   LB = LB,
-                   UB = UB,
-                   control =  con)
-
+      snp <- solnp(
+        pars = start,
+        fun = .LL_spARCH,
+        param = param, # .LL_spARCH_oriented_r
+        LB = LB,
+        UB = UB,
+        control = con
+      )
     } else if (dim(X)[2] > 0) {
-
       param <- list(y, W, X, isSymmetric(W)) # parameters and regressors
 
       LB <- c(1e-6, 0, rep(-Inf, dim(X)[2]))
@@ -68,21 +88,21 @@ qml.spARCH <- function(formula, W, type = "spARCH", data = NULL, b = 2, start = 
       default <- c(0.4, 1, rep(0, dim(X)[2]))
       start <- .teststart(start, LB, UB, default)
 
-      snp <- solnp(pars = start, fun = .LL_spARCHX, param = param,
-                   LB = LB,
-                   UB = UB,
-                   control =  con)
-
+      snp <- solnp(
+        pars = start,
+        fun = .LL_spARCHX,
+        param = param,
+        LB = LB,
+        UB = UB,
+        control = con
+      )
     } else {
       stop("X must be a matrix")
     }
-
   }
 
-  if (type == "log-spARCH"){
-
-    if(dim(X)[2] == 0){
-
+  if (type == "log-spARCH") {
+    if (dim(X)[2] == 0) {
       param <- list(y, W, b) # parameters and regressors
 
       LB <- c(1e-6, 0)
@@ -90,13 +110,15 @@ qml.spARCH <- function(formula, W, type = "spARCH", data = NULL, b = 2, start = 
       default <- c(0.4, 1)
       start <- .teststart(start, LB, UB, default)
 
-      snp <- solnp(pars = start, fun = .LL_EspARCH, param = param,
-                   LB = LB,
-                   UB = UB,
-                   control =  con)
-
+      snp <- solnp(
+        pars = start,
+        fun = .LL_EspARCH,
+        param = param,
+        LB = LB,
+        UB = UB,
+        control = con
+      )
     } else if (dim(X)[2] > 0) {
-
       param <- list(y, W, b, X) # parameters and regressors
 
       LB <- c(1e-6, 0, rep(-Inf, dim(X)[2]))
@@ -104,48 +126,73 @@ qml.spARCH <- function(formula, W, type = "spARCH", data = NULL, b = 2, start = 
       default <- c(0.4, 1, rep(0, dim(X)[2]))
       start <- .teststart(start, LB, UB, default)
 
-      snp <- solnp(pars = start, fun = .LL_EspARCHX, param = param,
-                   LB = LB,
-                   UB = UB,
-                   control =  con)
-
+      snp <- solnp(
+        pars = start,
+        fun = .LL_EspARCHX,
+        param = param,
+        LB = LB,
+        UB = UB,
+        control = con
+      )
     } else {
       stop("X must be a matrix")
     }
-
   }
 
-  if (snp$convergence != 0){
+  if (snp$convergence != 0) {
     stop("Iterative maximization did not converge. \n")
   }
 
-  stderr <- tryCatch(sqrt(diag(solve(snp$hessian))),
-                     error = function(e) {warning("Hessian matrix is computationally singular (no standard errors)\n"); return(rep(NA, length(snp$pars)))})
+  stderr <- tryCatch(sqrt(diag(solve(snp$hessian))), error = function(e) {
+    warning("Hessian matrix is computationally singular (no standard errors)\n")
+    return(rep(NA, length(snp$pars)))
+  })
 
-  if(dim(X)[2] == 0){
-
+  if (dim(X)[2] == 0) {
     h <- as.vector(snp$pars[1] + snp$pars[2] * W %*% (y^2))
-    residuals <- as.vector(y/sqrt(h))
+    residuals <- as.vector(y / sqrt(h))
     names(residuals) <- names(y)
-    out <- list(coefficients = snp$pars, residuals = residuals, fitted.values = y - residuals,
-                terms = model_terms, df.residual = length(residuals) - length(snp$pars),
-                stderr = stderr, hessian = snp$hessian,
-                LL = -snp$values[length(snp$values)],
-                y = y,  h = h, type = type, W = W, call = cl, regressors = FALSE, AR = FALSE)
+    out <- list(
+      coefficients = snp$pars,
+      residuals = residuals,
+      fitted.values = y - residuals,
+      terms = model_terms,
+      df.residual = length(residuals) - length(snp$pars),
+      stderr = stderr,
+      hessian = snp$hessian,
+      LL = -snp$values[length(snp$values)],
+      y = y,
+      h = h,
+      type = type,
+      W = W,
+      call = cl,
+      regressors = FALSE,
+      AR = FALSE
+    )
   } else {
-
     xi <- y - X %*% snp$pars[3:length(snp$pars)]
     h <- as.vector(snp$pars[1] + snp$pars[2] * W %*% (xi^2))
-    residuals <- as.vector(xi/sqrt(h))
+    residuals <- as.vector(xi / sqrt(h))
     names(residuals) <- names(y)
-    out <- list(coefficients = snp$pars, residuals = xi, fitted.values = y - xi,
-                terms = model_terms, df.residual = length(xi) - length(snp$pars),
-                stderr = stderr, hessian = snp$hessian,
-                LL = -snp$values[length(snp$values)],
-                y = y,  h = h, type = type, W = W, call = cl, regressors = TRUE, X = X, AR = FALSE)
-
+    out <- list(
+      coefficients = snp$pars,
+      residuals = xi,
+      fitted.values = y - xi,
+      terms = model_terms,
+      df.residual = length(xi) - length(snp$pars),
+      stderr = stderr,
+      hessian = snp$hessian,
+      LL = -snp$values[length(snp$values)],
+      y = y,
+      h = h,
+      type = type,
+      W = W,
+      call = cl,
+      regressors = TRUE,
+      X = X,
+      AR = FALSE
+    )
   }
-
 
   return(structure(out, class = c("spARCH")))
 }
@@ -293,22 +340,35 @@ qml.spARCH <- function(formula, W, type = "spARCH", data = NULL, b = 2, start = 
 #   return(structure(out, class = c("spGARCH")))
 # }
 
-
-
-
-
 # SARspARCH process
 
-qml.SARspARCH <- function(formula, B, W, type = "spARCH", data = NULL, b = 2, start = NULL, eigen_v = NULL, control = list()){
-
+qml.SARspARCH <- function(
+  formula,
+  B,
+  W,
+  type = "spARCH",
+  data = NULL,
+  b = 2,
+  start = NULL,
+  eigen_v = NULL,
+  control = list()
+) {
   cl <- match.call()
-  con <- list(trace = FALSE, rho = 1, outer.iter = 400, inner.iter = 800, delta = 1.0e-7, tol = 1.0e-8)
+  con <- list(
+    trace = FALSE,
+    rho = 1,
+    outer.iter = 400,
+    inner.iter = 800,
+    delta = 1.0e-7,
+    tol = 1.0e-8
+  )
   nmsC <- names(con)
   con[(namc <- names(control))] <- control
-  if (length(noNms <- namc[!namc %in% nmsC]))
+  if (length(noNms <- namc[!namc %in% nmsC])) {
     warning("unknown names in control: ", paste(noNms, collapse = ", "))
+  }
 
-  if(!is.element(type, c("spARCH", "log-spARCH"))){
+  if (!is.element(type, c("spARCH", "log-spARCH"))) {
     stop("invalid type: ", type)
   }
 
@@ -317,150 +377,203 @@ qml.SARspARCH <- function(formula, B, W, type = "spARCH", data = NULL, b = 2, st
   y <- model.response(model_frame)
   X <- model.matrix(model_terms, model_frame)
 
-  if (length(dim(y)) > 0 | !inherits(y, "numeric") | mode(y) != "numeric"){
+  if (length(dim(y)) > 0 | !inherits(y, "numeric") | mode(y) != "numeric") {
     stop("'y' must be a numeric vector \n")
   }
 
-  if (dim(B)[1] != dim(B)[2] | dim(W)[1] != dim(W)[2]){
+  if (dim(B)[1] != dim(B)[2] | dim(W)[1] != dim(W)[2]) {
     stop("Spatial weighting matrices must be quadratic \n")
   }
-  if (length(y) != dim(B)[1] | length(y) != dim(W)[1]){
-    stop(paste("Spatial weight matrix must have dimension", length(y), "x", length(y), "(length of y) \n"))
+  if (length(y) != dim(B)[1] | length(y) != dim(W)[1]) {
+    stop(paste(
+      "Spatial weight matrix must have dimension",
+      length(y),
+      "x",
+      length(y),
+      "(length of y) \n"
+    ))
   }
-  if (!inherits(B, "dgCMatrix")){
+  if (!inherits(B, "dgCMatrix")) {
     B <- .asdgCMatrix(as.matrix(B))
   }
-  if (!inherits(W, "dgCMatrix")){
+  if (!inherits(W, "dgCMatrix")) {
     W <- .asdgCMatrix(as.matrix(W))
   }
 
-  if(is.null(eigen_v)){
+  if (is.null(eigen_v)) {
     eigen <- eigen(B, only.values = TRUE)
     B_eigen <- eigen$values
   } else {
     eigen <- list(values = eigen_v, vector = NULL)
     B_eigen <- eigen_v
   }
-  if(min(eigen$values) == 0){
+  if (min(eigen$values) == 0) {
     min_lambda <- -Inf
   } else {
     min_lambda <- 1 / min(eigen$values) + 1e-6
   }
-  if(max(eigen$values) == 0){
+  if (max(eigen$values) == 0) {
     max_lambda <- Inf
   } else {
     max_lambda <- 1 / max(eigen$values) - 1e-6
   }
 
-  if(is.null(names(y))){
+  if (is.null(names(y))) {
     names(y) <- as.character(1:length(y))
   }
 
-  if (type == "spARCH"){
-
-    if(dim(X)[2] == 0){
-
+  if (type == "spARCH") {
+    if (dim(X)[2] == 0) {
       param <- list(y, B, W, B_eigen, isSymmetric(W)) # parameters and regressors
 
       LB <- c(1e-6, 0, min_lambda)
       UB <- c(Inf, Inf, max_lambda)
-      st_lambda <- ifelse(any(!is.finite(c(min_lambda, max_lambda))), 0, (UB[3] + LB[3])/2)
+      st_lambda <- ifelse(
+        any(!is.finite(c(min_lambda, max_lambda))),
+        0,
+        (UB[3] + LB[3]) / 2
+      )
       default <- c(0.4, 0.4, st_lambda)
       start <- .teststart(start, LB, UB, default)
 
-      snp <- solnp(pars = start, fun = .LL_SARspARCH, param = param,
-                   LB = LB,
-                   UB = UB,
-                   control =  con)
-
+      snp <- solnp(
+        pars = start,
+        fun = .LL_SARspARCH,
+        param = param,
+        LB = LB,
+        UB = UB,
+        control = con
+      )
     } else if (dim(X)[2] > 0) {
-
       param <- list(y, B, W, X, B_eigen, isSymmetric(W)) # parameters and regressors
 
       LB <- c(1e-6, 0, min_lambda, rep(-Inf, dim(X)[2]))
       UB <- c(Inf, Inf, max_lambda, rep(Inf, dim(X)[2]))
-      st_lambda <- ifelse(any(!is.finite(c(min_lambda, max_lambda))), 0, (UB[3] + LB[3])/2)
+      st_lambda <- ifelse(
+        any(!is.finite(c(min_lambda, max_lambda))),
+        0,
+        (UB[3] + LB[3]) / 2
+      )
       default <- c(0.4, 0.4, st_lambda, rep(0, dim(X)[2]))
       start <- .teststart(start, LB, UB, default)
 
-      snp <- solnp(pars = start, fun = .LL_SARspARCHX, param = param,
-                   LB = LB,
-                   UB = UB,
-                   control =  con)
-
+      snp <- solnp(
+        pars = start,
+        fun = .LL_SARspARCHX,
+        param = param,
+        LB = LB,
+        UB = UB,
+        control = con
+      )
     } else {
       stop("X must be a matrix")
     }
-
   }
 
-  if (type == "log-spARCH"){
-
-    if(dim(X)[2] == 0){
-
+  if (type == "log-spARCH") {
+    if (dim(X)[2] == 0) {
       param <- list(y, B, W, b, B_eigen) # parameters and regressors
 
       LB <- c(1e-6, 0, min_lambda)
       UB <- c(Inf, Inf, max_lambda)
-      st_lambda <- ifelse(any(!is.finite(c(min_lambda, max_lambda))), 0, (UB[3] + LB[3])/2)
+      st_lambda <- ifelse(
+        any(!is.finite(c(min_lambda, max_lambda))),
+        0,
+        (UB[3] + LB[3]) / 2
+      )
       default <- c(0.4, 0.4, st_lambda)
       start <- .teststart(start, LB, UB, default)
 
-      snp <- solnp(pars = start, fun = .LL_SAREspARCH, param = param,
-                   LB = LB,
-                   UB = UB,
-                   control =  con)
-
+      snp <- solnp(
+        pars = start,
+        fun = .LL_SAREspARCH,
+        param = param,
+        LB = LB,
+        UB = UB,
+        control = con
+      )
     } else if (dim(X)[2] > 0) {
-
       param <- list(y, B, W, b, X, B_eigen) # parameters and regressors
 
       LB <- c(1e-6, 0, min_lambda, rep(-Inf, dim(X)[2]))
       UB <- c(Inf, Inf, max_lambda, rep(Inf, dim(X)[2]))
-      st_lambda <- ifelse(any(!is.finite(c(min_lambda, max_lambda))), 0, (UB[3] + LB[3])/2)
+      st_lambda <- ifelse(
+        any(!is.finite(c(min_lambda, max_lambda))),
+        0,
+        (UB[3] + LB[3]) / 2
+      )
       default <- c(0.4, 0.4, st_lambda, rep(0, dim(X)[2]))
       start <- .teststart(start, LB, UB, default)
 
-      snp <- solnp(pars = start, fun = .LL_SAREspARCHX, param = param,
-                   LB = LB,
-                   UB = UB,
-                   control =  con)
-
+      snp <- solnp(
+        pars = start,
+        fun = .LL_SAREspARCHX,
+        param = param,
+        LB = LB,
+        UB = UB,
+        control = con
+      )
     } else {
       stop("X must be a matrix")
     }
-
   }
 
-  if (snp$convergence != 0){
+  if (snp$convergence != 0) {
     stop("Iterative maximization did not converge. \n")
   }
 
-  stderr <- tryCatch(sqrt(diag(solve(snp$hessian))),
-                     error = function(e) {warning("Hessian matrix is computationally singular (no standard errors)\n"); return(rep(NA, length(snp$pars)))})
+  stderr <- tryCatch(sqrt(diag(solve(snp$hessian))), error = function(e) {
+    warning("Hessian matrix is computationally singular (no standard errors)\n")
+    return(rep(NA, length(snp$pars)))
+  })
 
-  if(dim(X)[2] == 0){
-
+  if (dim(X)[2] == 0) {
     xi <- as.vector(y - snp$pars[3] * B %*% y)
     h <- as.vector(snp$pars[1] + snp$pars[2] * W %*% (xi^2))
-    residuals <- as.vector(xi/sqrt(h))
+    residuals <- as.vector(xi / sqrt(h))
     names(residuals) <- names(y)
-    out <- list(coefficients = snp$pars, residuals = xi, fitted.values = y - xi,
-                stderr = stderr, hessian = snp$hessian,
-                LL = -snp$values[length(snp$values)],
-                y = y,  h = h, type = type, W = W, B = B, call = cl, regressors = FALSE, AR = TRUE)
+    out <- list(
+      coefficients = snp$pars,
+      residuals = xi,
+      fitted.values = y - xi,
+      stderr = stderr,
+      hessian = snp$hessian,
+      LL = -snp$values[length(snp$values)],
+      y = y,
+      h = h,
+      type = type,
+      W = W,
+      B = B,
+      call = cl,
+      regressors = FALSE,
+      AR = TRUE
+    )
   } else {
-
-    xi <- as.vector(y - snp$pars[3] * B %*% y - X %*% snp$pars[4:length(snp$pars)])
+    xi <- as.vector(
+      y - snp$pars[3] * B %*% y - X %*% snp$pars[4:length(snp$pars)]
+    )
     h <- as.vector(snp$pars[1] + snp$pars[2] * W %*% (xi^2))
-    residuals <- as.vector(xi/sqrt(h))
+    residuals <- as.vector(xi / sqrt(h))
     names(residuals) <- names(y)
-    out <- list(coefficients = snp$pars, residuals = xi, fitted.values = y - xi,
-                terms = model_terms, df.residual = length(xi) - length(snp$pars),
-                stderr = stderr, hessian = snp$hessian,
-                LL = -snp$values[length(snp$values)],
-                y = y,  h = h, type = type, W = W, B = B, call = cl, regressors = TRUE, X = X, AR = TRUE)
-
+    out <- list(
+      coefficients = snp$pars,
+      residuals = xi,
+      fitted.values = y - xi,
+      terms = model_terms,
+      df.residual = length(xi) - length(snp$pars),
+      stderr = stderr,
+      hessian = snp$hessian,
+      LL = -snp$values[length(snp$values)],
+      y = y,
+      h = h,
+      type = type,
+      W = W,
+      B = B,
+      call = cl,
+      regressors = TRUE,
+      X = X,
+      AR = TRUE
+    )
   }
 
   return(structure(out, class = c("spARCH")))
@@ -472,66 +585,101 @@ qml.SARspARCH <- function(formula, B, W, type = "spARCH", data = NULL, b = 2, st
 #
 ##################################################
 
-spARCH <- setClass("spARCH", slots = c(coefficients = "numeric", residuals = "numeric", fitted.values = "numeric",
-                                       terms = "formula", df.residual = "numeric",
-                                       stderr = "numeric", hessian = "matrix",
-                                       LL = "numeric",
-                                       y = "numeric", h = "numeric", type = "character", W = "dgCMatrix", B = "dgCMatrix", call = "call",
-                                       regressors = "logical", X = "matrix", AR = "logical"))
+spARCH <- setClass(
+  "spARCH",
+  slots = c(
+    coefficients = "numeric",
+    residuals = "numeric",
+    fitted.values = "numeric",
+    terms = "formula",
+    df.residual = "numeric",
+    stderr = "numeric",
+    hessian = "matrix",
+    LL = "numeric",
+    y = "numeric",
+    h = "numeric",
+    type = "character",
+    W = "dgCMatrix",
+    B = "dgCMatrix",
+    call = "call",
+    regressors = "logical",
+    X = "matrix",
+    AR = "logical"
+  )
+)
 
 
-
-
-summary.spARCH <- function(object, ...){
-
+summary.spARCH <- function(object, ...) {
   # Coefficients
 
   coef <- array(, dim = c(length(object$coefficients), 4))
-  coef[,1] <- object$coefficients
-  coef[,2] <- object$stderr
-  coef[,3] <- coef[,1] / coef[,2]
-  coef[,4] <- 2 * (1 - pnorm(abs(coef[,3])))
+  coef[, 1] <- object$coefficients
+  coef[, 2] <- object$stderr
+  coef[, 3] <- coef[, 1] / coef[, 2]
+  coef[, 4] <- 2 * (1 - pnorm(abs(coef[, 3])))
   colnames(coef) <- c("Estimate", "Std. Error", "t value", "Pr(>|t|)")
-  if(object$AR){
+  if (object$AR) {
     par_names <- c("alpha (spARCH)", "rho (spARCH)", "lambda (SAR)")
   } else {
     par_names <- c("alpha", "rho")
   }
-  if(object$regressors){
+  if (object$regressors) {
     rownames(coef) <- c(par_names, colnames(object$X))
   } else {
     rownames(coef) <- c(par_names)
   }
-
 
   object$coef <- coef
 
   # Information criteria
 
   object$AIC <- 2 * length(object$coefficients) - 2 * object$LL
-  object$BIC <- log(length(residuals)) * length(object$coefficients) - 2 * object$LL
+  object$BIC <- log(length(residuals)) *
+    length(object$coefficients) -
+    2 * object$LL
 
   # Spatial autocorrelation of the residuals
 
-  if(object$AR){
-    object$moran_res <- moran.test(object$residuals, mat2listw(object$B), zero.policy = TRUE, alternative = "two.sided")
+  if (object$AR) {
+    object$moran_res <- moran.test(
+      object$residuals,
+      mat2listw(object$B),
+      zero.policy = TRUE,
+      alternative = "two.sided"
+    )
   } else {
-    object$moran_res <- moran.test(object$residuals, mat2listw(object$W), zero.policy = TRUE, alternative = "two.sided")
+    object$moran_res <- moran.test(
+      object$residuals,
+      mat2listw(object$W),
+      zero.policy = TRUE,
+      alternative = "two.sided"
+    )
   }
-  object$moran_sq_res <- moran.test(object$residuals^2, mat2listw(object$W), zero.policy = TRUE, alternative = "two.sided")
+  object$moran_sq_res <- moran.test(
+    object$residuals^2,
+    mat2listw(object$W),
+    zero.policy = TRUE,
+    alternative = "two.sided"
+  )
 
   # return
 
   return(structure(object, class = c("summary.spARCH", class(object))))
 }
 
-print.spARCH <- function(x, ...){
-  cat("Use the summary function to print a detailed summary of the estimation results. \n ?summary.spARCH \n")
+print.spARCH <- function(x, ...) {
+  cat(
+    "Use the summary function to print a detailed summary of the estimation results. \n ?summary.spARCH \n"
+  )
   return(str(x))
 }
 
-print.summary.spARCH <- function(x, digits = max(5, .Options$digits - 3), signif.stars = TRUE, ...){
-
+print.summary.spARCH <- function(
+  x,
+  digits = max(5, .Options$digits - 3),
+  signif.stars = TRUE,
+  ...
+) {
   # Call
   cat("\n Call: \n")
   print(x$call)
@@ -543,19 +691,46 @@ print.summary.spARCH <- function(x, digits = max(5, .Options$digits - 3), signif
   # Moran's I of residuals and squared residuals - TO_DO
   # Coefficients
   cat("\n Coefficients: \n")
-  printCoefmat(x$coef, signif.stars = signif.stars, digits = digits, na.print = "NA")
+  printCoefmat(
+    x$coef,
+    signif.stars = signif.stars,
+    digits = digits,
+    na.print = "NA"
+  )
   cat("\n Note: all p-values (incl. significance stars) are asymptotic \n")
   # Further stuff
-  cat("\n AIC: ", format(signif(x$AIC, digits)), ", BIC: ", format(signif(x$BIC, digits)), " (Log-Likelihood: ", format(signif(x$LL, digits)), ") \n", sep = "")
-  cat("\n Moran's I (residuals): ",  format(signif(x$moran_res$estimate[1], digits)), ", p-value: ", format(signif(x$moran_res$p.value, digits)), "\n", sep = "")
-  cat("\n Moran's I (squared residuals): ",  format(signif(x$moran_sq_res$estimate[1], digits)), ", p-value: ",  format(signif(x$moran_sq_res$p.value, digits)), "\n", sep = "")
+  cat(
+    "\n AIC: ",
+    format(signif(x$AIC, digits)),
+    ", BIC: ",
+    format(signif(x$BIC, digits)),
+    " (Log-Likelihood: ",
+    format(signif(x$LL, digits)),
+    ") \n",
+    sep = ""
+  )
+  cat(
+    "\n Moran's I (residuals): ",
+    format(signif(x$moran_res$estimate[1], digits)),
+    ", p-value: ",
+    format(signif(x$moran_res$p.value, digits)),
+    "\n",
+    sep = ""
+  )
+  cat(
+    "\n Moran's I (squared residuals): ",
+    format(signif(x$moran_sq_res$estimate[1], digits)),
+    ", p-value: ",
+    format(signif(x$moran_sq_res$p.value, digits)),
+    "\n",
+    sep = ""
+  )
 
   cat("\n")
   invisible(x)
 }
 
-logLik.spARCH <- function(object, ...){
-
+logLik.spARCH <- function(object, ...) {
   LL <- c(object$LL)
   class(LL) <- "logLik"
   N <- length(object$residuals)
@@ -566,33 +741,35 @@ logLik.spARCH <- function(object, ...){
   return(LL)
 }
 
-extractAIC.spARCH <- function(fit, scale = 0, k = 2, ...){
-
+extractAIC.spARCH <- function(fit, scale = 0, k = 2, ...) {
   n <- length(fit$residuals)
   edf <- n - fit$df.residual
   LL <- logLik.spARCH(fit)
 
-  return(c(edf, - 2 * LL + k * edf))
+  return(c(edf, -2 * LL + k * edf))
 }
 
-fitted.spARCH <- function(object, ...){
+fitted.spARCH <- function(object, ...) {
   return(object$fitted.values)
 }
 
-residuals.spARCH <- function(object, ...){
+residuals.spARCH <- function(object, ...) {
   return(object$residuals)
 }
 
-plot.spARCH <- function (x, which = c(1:3),
-            ask = prod(par("mfcol")) < length(which) && dev.interactive(), ...,
-            qqline = TRUE){
-
+plot.spARCH <- function(
+  x,
+  which = c(1:3),
+  ask = prod(par("mfcol")) < length(which) && dev.interactive(),
+  ...,
+  qqline = TRUE
+) {
   exp_dots <- match.call(expand.dots = FALSE)$`...`
 
-  if (!inherits(x, "spARCH")){
+  if (!inherits(x, "spARCH")) {
     stop("use only with \"spARCH\" objects")
   }
-  if(!is.numeric(which) || any(which < 1) || any(which > 3)){
+  if (!is.numeric(which) || any(which < 1) || any(which > 3)) {
     stop("'which' must be between 1 and 3")
   }
   show <- rep(FALSE, 3)
@@ -605,48 +782,71 @@ plot.spARCH <- function (x, which = c(1:3),
   }
 
   xlab <- c("Residuals", "Squared Residuals")
-  ylab <- c("Spatially Lagged Residuals", "Spatially Lagged Squared Residuals", "Standardized Residuals")
+  ylab <- c(
+    "Spatially Lagged Residuals",
+    "Spatially Lagged Squared Residuals",
+    "Standardized Residuals"
+  )
   zero <- TRUE
 
-  if(show[1]){
+  if (show[1]) {
     dev.hold()
 
     eps <- residuals(x)
     W <- as.matrix(x$W)
-    moran.plot(eps, mat2listw(W), zero.policy = zero, xlab = xlab[1], ylab = ylab[1], ...)
+    moran.plot(
+      eps,
+      mat2listw(W),
+      zero.policy = zero,
+      xlab = xlab[1],
+      ylab = ylab[1],
+      ...
+    )
 
     cat("Reproduce the results as follows: \n")
-    cat("\t eps <- residuals(x) \n\t W <- as.matrix(x$W) \n\t moran.plot(eps, mat2listw(W), zero.policy = TRUE, xlab = \"Residuals\", ylab = \"Spatially Lagged Residuals\") \n")
+    cat(
+      "\t eps <- residuals(x) \n\t W <- as.matrix(x$W) \n\t moran.plot(eps, mat2listw(W), zero.policy = TRUE, xlab = \"Residuals\", ylab = \"Spatially Lagged Residuals\") \n"
+    )
 
     dev.flush()
   }
-  if(show[2]){
+  if (show[2]) {
     dev.hold()
 
     eps <- residuals(x)
     W <- as.matrix(x$W)
-    moran.plot(eps^2, mat2listw(W), zero.policy = zero, xlab = xlab[2], ylab = ylab[2], ...)
+    moran.plot(
+      eps^2,
+      mat2listw(W),
+      zero.policy = zero,
+      xlab = xlab[2],
+      ylab = ylab[2],
+      ...
+    )
 
     cat("Reproduce the results as follows: \n")
-    cat("\t eps <- residuals(x) \n\t W <- as.matrix(x$W) \n\t moran.plot(eps^2, mat2listw(W), zero.policy = TRUE, xlab = \"Residuals\", ylab = \"Spatially Lagged Residuals\") \n")
+    cat(
+      "\t eps <- residuals(x) \n\t W <- as.matrix(x$W) \n\t moran.plot(eps^2, mat2listw(W), zero.policy = TRUE, xlab = \"Residuals\", ylab = \"Spatially Lagged Residuals\") \n"
+    )
 
     dev.flush()
   }
-  if(show[3]){
+  if (show[3]) {
     dev.hold()
 
     eps <- residuals(x)
-    std_eps <- (eps - mean(eps))/sd(eps)
+    std_eps <- (eps - mean(eps)) / sd(eps)
     qqnorm(eps, ylab = ylab[3], ...)
 
     cat("Reproduce the results as follows: \n")
-    cat("\t eps <- residuals(x) \n\t std_eps <- (eps - mean(eps))/sd(eps) \n\t qqnorm(eps, ylab = \"Standardized Residuals\") \n")
+    cat(
+      "\t eps <- residuals(x) \n\t std_eps <- (eps - mean(eps))/sd(eps) \n\t qqnorm(eps, ylab = \"Standardized Residuals\") \n"
+    )
 
-    if(qqline){
+    if (qqline) {
       qqline(eps)
       cat("\t qqline(eps) \n")
     }
-
 
     dev.flush()
   }
@@ -660,21 +860,52 @@ plot.spARCH <- function (x, which = c(1:3),
 #
 ##################################################
 
-.teststart <- function(start, LB, UB, default){
-  if(!is.null(start)){
-    if(length(start) != length(LB)){
-      stop(paste("For the chosen model, the vector of starting values must have length ", length(UB), ". Current size: ", length(start), sep = ""))
+.teststart <- function(start, LB, UB, default) {
+  if (!is.null(start)) {
+    if (length(start) != length(LB)) {
+      stop(paste(
+        "For the chosen model, the vector of starting values must have length ",
+        length(UB),
+        ". Current size: ",
+        length(start),
+        sep = ""
+      ))
     }
-    if(any(start > UB | start < LB)){
-      if(any(start < LB) & all(start < UB)){
-        stop(paste("The ", .ord(which(start < LB)), " starting value(s) is/are smaller than the lower bound (", LB[which(start < LB)],")\n", sep = ""))
+    if (any(start > UB | start < LB)) {
+      if (any(start < LB) & all(start < UB)) {
+        stop(paste(
+          "The ",
+          .ord(which(start < LB)),
+          " starting value(s) is/are smaller than the lower bound (",
+          LB[which(start < LB)],
+          ")\n",
+          sep = ""
+        ))
       }
-      if(any(start > UB) & all(start > LB)){
-        stop(paste("The ", .ord(which(start > UB)), " starting value(s) is/are larger than the upper bound (", UB[which(start > UB)],")\n", sep = ""))
+      if (any(start > UB) & all(start > LB)) {
+        stop(paste(
+          "The ",
+          .ord(which(start > UB)),
+          " starting value(s) is/are larger than the upper bound (",
+          UB[which(start > UB)],
+          ")\n",
+          sep = ""
+        ))
       }
-      if(any(start > UB) & any(start < LB)){
-        stop(paste("The ", .ord(which(start > UB)), " starting value(s) is/are larger than the upper bound (", UB[which(start > UB)],"). ",
-                   "Moreover, the ", .ord(which(start < LB)), " starting value(s) is/are smaller than the lower bound (", LB[which(start < LB)],")\n", sep = ""))
+      if (any(start > UB) & any(start < LB)) {
+        stop(paste(
+          "The ",
+          .ord(which(start > UB)),
+          " starting value(s) is/are larger than the upper bound (",
+          UB[which(start > UB)],
+          "). ",
+          "Moreover, the ",
+          .ord(which(start < LB)),
+          " starting value(s) is/are smaller than the lower bound (",
+          LB[which(start < LB)],
+          ")\n",
+          sep = ""
+        ))
       }
     }
     return(start)
@@ -683,15 +914,15 @@ plot.spARCH <- function (x, which = c(1:3),
   }
 }
 
-.ord <- function(numbers){
-  rules_inner <- function(x){
-    if(x%%10 == 1 & x != 11){
+.ord <- function(numbers) {
+  rules_inner <- function(x) {
+    if (x %% 10 == 1 & x != 11) {
       return(paste(as.character(x), "st", sep = ""))
     }
-    if(x%%10 == 2 & x != 12){
+    if (x %% 10 == 2 & x != 12) {
       return(paste(as.character(x), "nd", sep = ""))
     }
-    if(x%%10 == 3 & x != 13){
+    if (x %% 10 == 3 & x != 13) {
       return(paste(as.character(x), "rd", sep = ""))
     } else {
       return(paste(as.character(x), "th", sep = ""))
@@ -707,59 +938,57 @@ plot.spARCH <- function (x, which = c(1:3),
 #
 ##################################################
 
-.LL_unified <- function(pars, param){
+.LL_unified <- function(pars, param) {
+  model <- param$model
 
-  model  <- param$model
-
-  if(is.element(model, c("spGARCH", "h-spGARCH"))){
-    alpha  <- pars[1]
-    rho    <- pars[2]
+  if (is.element(model, c("spGARCH", "h-spGARCH"))) {
+    alpha <- pars[1]
+    rho <- pars[2]
     lambda <- pars[3]
-    theta  <- 1
-    zeta   <- 1
-    b      <- 1
-  } else if(is.element(model, c("log-spGARCH"))) {
-    alpha  <- pars[1]
-    rho    <- pars[2]
+    theta <- 1
+    zeta <- 1
+    b <- 1
+  } else if (is.element(model, c("log-spGARCH"))) {
+    alpha <- pars[1]
+    rho <- pars[2]
     lambda <- pars[3]
-    theta  <- NULL
-    zeta   <- NULL
-    b      <- pars[4]
-  } else if(is.element(model, c("e-spGARCH"))) {
-    alpha  <- pars[1]
-    rho    <- pars[2]
+    theta <- NULL
+    zeta <- NULL
+    b <- pars[4]
+  } else if (is.element(model, c("e-spGARCH"))) {
+    alpha <- pars[1]
+    rho <- pars[2]
     lambda <- pars[3]
-    theta  <- pars[4]
-    zeta   <- pars[5]
-    b      <- NULL
+    theta <- pars[4]
+    zeta <- pars[5]
+    b <- NULL
   }
 
-
-  y         <- param$y
-  f_inv     <- param$f_inv
-  tau_y     <- param$tau_y
-  W_1       <- param$W_1
-  W_2       <- param$W_2
-  g         <- param$g
+  y <- param$y
+  f_inv <- param$f_inv
+  tau_y <- param$tau_y
+  W_1 <- param$W_1
+  W_2 <- param$W_2
+  g <- param$g
   d_h_d_eps <- param$d_h_d_eps
 
-  n            <- length(y)
-  rhoW_1       <- rho * W_1
-  lambdaW_2    <- lambda * W_2
-  alpha        <- alpha * rep(1, n)
+  n <- length(y)
+  rhoW_1 <- rho * W_1
+  lambdaW_2 <- lambda * W_2
+  alpha <- alpha * rep(1, n)
 
-  result_g     <- g(y, alpha, rhoW_1, lambdaW_2, theta, zeta, b, tau_y, f_inv)
-  eps          <- as.vector(result_g[[1]])
-  h            <- as.vector(result_g[[2]])
+  result_g <- g(y, alpha, rhoW_1, lambdaW_2, theta, zeta, b, tau_y, f_inv)
+  eps <- as.vector(result_g[[1]])
+  h <- as.vector(result_g[[2]])
 
-  J <- 0.5 * eps / sqrt(h) * d_h_d_eps(eps, h, alpha, theta, zeta, b, rhoW_1, lambdaW_2) + diag(sqrt(h))
+  J <- 0.5 *
+    eps /
+    sqrt(h) *
+    d_h_d_eps(eps, h, alpha, theta, zeta, b, rhoW_1, lambdaW_2) +
+    diag(sqrt(h))
 
   return((-1) * (sum(log(dnorm(eps))) - log(det(J))))
-
 }
-
-
-
 
 #
 # .LL_spARCHX_r <- function(pars, param){
