@@ -168,10 +168,10 @@ sim.spGARCH <- function(n = dim(W1)[1], rho, lambda, alpha, W1, W2,
   S     <- Matrix::solve(Matrix::Diagonal(n) - W2)
   X     <- S %*% (alpha + W1 %*% tau)
 
-  if(type == "complex-spGARCH"){
-    Y     <- diag(as.complex(as.vector(f_inv(X))))^(0.5) %*% eps
+  if (type == "complex-spGARCH") {
+    Y <- sqrt(as.complex(f_inv(X))) * eps
   } else {
-    Y     <- diag(as.vector(f_inv(X)))^(0.5) %*% eps
+    Y <- sqrt(as.vector(f_inv(X))) * eps
   }
 
   return(as.vector(Y))
