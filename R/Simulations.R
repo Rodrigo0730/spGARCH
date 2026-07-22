@@ -7,20 +7,24 @@
 
 # spatial ARCH process
 
-sim.spARCH <- function(n = dim(W)[1], rho, alpha, W, b = 2, type = "spARCH", control = list()){
+sim.spARCH <- function(n = dim(W)[1], rho, alpha, W, b = 2, type = "spARCH",
+                       seed = NULL, control = list()) {
 
-  if(!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)){
-    runif(1) # initialize the RNG
+  if (!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+    runif(1)
   }
 
   con <- list(seed = runif(1) * 10^9, silent = FALSE, triangular = FALSE)
   nmsC <- names(con)
   con[(namc <- names(control))] <- control
-  if (length(noNms <- namc[!namc %in% nmsC])){
+  if (length(noNms <- namc[!namc %in% nmsC])) {
     warning("unknown names in control: ", paste(noNms, collapse = ", "))
   }
+  if (!is.null(seed)) {
+    con$seed <- seed
+  }
 
-  if(!is.element(type, c("spARCH", "log-spARCH", "complex-spARCH"))){
+  if (!is.element(type, c("spARCH", "log-spARCH", "complex-spARCH"))) {
     stop("invalid type: ", type)
   }
 
@@ -66,8 +70,9 @@ sim.spARCH <- function(n = dim(W)[1], rho, alpha, W, b = 2, type = "spARCH", con
     eps <- rnorm(n)
   }
 
-  if (con$silent == FALSE){
-    cat("Current random seed: ", con$seed, " (To reproduce the results, add argument 'seed = ", con$seed, "' to control argument) \n", sep = "")
+  if (!con$silent) {
+    cat("Current random seed: ", con$seed,
+        " (To reproduce, use argument 'seed = ", con$seed, "') \n", sep = "")
   }
   if (type == "log-spARCH") {
     return(.Simulation_CPP_E(eps, W, alpha, b))
@@ -82,17 +87,22 @@ sim.spARCH <- function(n = dim(W)[1], rho, alpha, W, b = 2, type = "spARCH", con
 }
 
 
-sim.spGARCH <- function(n = dim(W1)[1], rho, lambda, alpha, W1, W2, b = 2, zeta = 0.5, theta = 0.5, type = "spGARCH", control = list()){
+sim.spGARCH <- function(n = dim(W1)[1], rho, lambda, alpha, W1, W2,
+                       b = 2, zeta = 0.5, theta = 0.5,
+                       type = "spGARCH", seed = NULL, control = list()) {
 
-  if(!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)){
-    runif(1) # initialize the RNG
+  if (!exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+    runif(1)
   }
 
   con <- list(seed = runif(1) * 10^9, silent = FALSE, triangular = FALSE)
   nmsC <- names(con)
   con[(namc <- names(control))] <- control
-  if (length(noNms <- namc[!namc %in% nmsC])){
+  if (length(noNms <- namc[!namc %in% nmsC])) {
     warning("unknown names in control: ", paste(noNms, collapse = ", "))
+  }
+  if (!is.null(seed)) {
+    con$seed <- seed
   }
 
   R.seed <- get(".Random.seed", envir = .GlobalEnv)
