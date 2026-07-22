@@ -5,7 +5,8 @@
 The function generates \code{n} random numbers of a spatial ARCH process for given parameters and weighting schemes.
 }
 \usage{
-sim.spARCH(n = dim(W)[1], rho, alpha, W, b = 2, type = "spARCH", control = list())
+sim.spARCH(n = dim(W)[1], rho, alpha, W, b = 2, type = "spARCH",
+           seed = NULL, control = list())
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -15,6 +16,7 @@ sim.spARCH(n = dim(W)[1], rho, alpha, W, b = 2, type = "spARCH", control = list(
   \item{W}{\code{n} times \code{n} spatial weight matrix}
   \item{b}{parameter \code{b} for logarithmic spatial ARCH (only needed if \code{type = "log-spARCH"}). Default 2.}
   \item{type}{type of simulated spARCH process (see details)}
+  \item{seed}{positive integer to initialize the random number generator (RNG). If \code{NULL} (default), a random seed is drawn. Overrides \code{control$seed} if both are provided.}
   \item{control}{list of control arguments (see below)}
 }
 \details{

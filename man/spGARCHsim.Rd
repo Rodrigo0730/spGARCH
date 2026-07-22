@@ -7,7 +7,7 @@ The function generates \code{n} random numbers of a spatial GARCH process for gi
 \usage{
 sim.spGARCH(n = dim(W1)[1], rho, lambda, alpha, W1, W2,
             b = 2, zeta = 0.5, theta = 0.5, type = "spGARCH",
-            control = list())
+            seed = NULL, control = list())
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -21,6 +21,7 @@ sim.spGARCH(n = dim(W1)[1], rho, lambda, alpha, W1, W2,
   \item{zeta}{parameter \code{zeta} for exponential spatial GARCH (only needed if \code{type = "e-spGARCH"}). Default 0.5.}
   \item{theta}{parameter \code{theta} for exponential spatial GARCH (only needed if \code{type = "e-spGARCH"}). Default 0.5.}
   \item{type}{type of simulated spGARCH process (see details)}
+  \item{seed}{positive integer to initialize the random number generator (RNG). If \code{NULL} (default), a random seed is drawn. Overrides \code{control$seed} if both are provided.}
   \item{control}{list of control arguments (see below)}
 }
 \details{
