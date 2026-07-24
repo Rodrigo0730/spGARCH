@@ -30,7 +30,9 @@ sim.spARCH <- function(
     con$seed <- seed
   }
 
-  if (!is.element(type, c("spARCH", "log-spARCH", "e-spARCH", "complex-spARCH"))) {
+  if (
+    !is.element(type, c("spARCH", "log-spARCH", "e-spARCH", "complex-spARCH"))
+  ) {
     stop("invalid type: ", type)
   }
 
@@ -56,6 +58,11 @@ sim.spARCH <- function(
     W <- methods::as(W, "dgCMatrix")
   }
   W <- rho * W
+
+  if (length(alpha) != 1) {
+    stop("sim.spARCH requires scalar 'alpha'")
+  }
+  alpha <- as.numeric(alpha)
 
   set.seed(con$seed)
 
@@ -300,7 +307,18 @@ sim.spGARCH_batch <- function(n_sim = 1, ..., seed = NULL, workers = 1) {
       return(list(eps = eps, h = f_inv(X)))
     }
 
-    d_h_d_eps <- function(eps, h, alpha, theta, zeta, b, W_1, W_2, rho, lambda) {
+    d_h_d_eps <- function(
+      eps,
+      h,
+      alpha,
+      theta,
+      zeta,
+      b,
+      W_1,
+      W_2,
+      rho,
+      lambda
+    ) {
       .d_h_d_eps_CPP(
         as.numeric(eps),
         as.numeric(h),
@@ -328,7 +346,18 @@ sim.spGARCH_batch <- function(n_sim = 1, ..., seed = NULL, workers = 1) {
       eps <- y / sqrt(as.vector(f_inv(X)))
       return(list(eps = eps, h = f_inv(X)))
     }
-    d_h_d_eps <- function(eps, h, alpha, theta, zeta, b, W_1, W_2, rho, lambda) {
+    d_h_d_eps <- function(
+      eps,
+      h,
+      alpha,
+      theta,
+      zeta,
+      b,
+      W_1,
+      W_2,
+      rho,
+      lambda
+    ) {
       tau_eps_prime <- function(eps) {
         return(2 / eps)
       }
@@ -358,7 +387,18 @@ sim.spGARCH_batch <- function(n_sim = 1, ..., seed = NULL, workers = 1) {
       eps <- y / sqrt(as.vector(f_inv(X)))
       return(list(eps = eps, h = f_inv(X)))
     }
-    d_h_d_eps <- function(eps, h, alpha, theta, zeta, b, W_1, W_2, rho, lambda) {
+    d_h_d_eps <- function(
+      eps,
+      h,
+      alpha,
+      theta,
+      zeta,
+      b,
+      W_1,
+      W_2,
+      rho,
+      lambda
+    ) {
       n <- length(eps)
       rhoW_1 <- rho * W_1
       lambdaW_2 <- lambda * W_2
@@ -391,7 +431,18 @@ sim.spGARCH_batch <- function(n_sim = 1, ..., seed = NULL, workers = 1) {
       eps <- y / sqrt(as.vector(f_inv(X)))
       return(list(eps = eps, h = f_inv(X)))
     }
-    d_h_d_eps <- function(eps, h, alpha, theta, zeta, b, W_1, W_2, rho, lambda) {
+    d_h_d_eps <- function(
+      eps,
+      h,
+      alpha,
+      theta,
+      zeta,
+      b,
+      W_1,
+      W_2,
+      rho,
+      lambda
+    ) {
       n <- length(eps)
       rhoW_1 <- rho * W_1
       lambdaW_2 <- lambda * W_2

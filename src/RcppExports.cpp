@@ -6,6 +6,11 @@
 
 using namespace Rcpp;
 
+#ifdef RCPP_USE_GLOBAL_ROSTREAM
+Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
+Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
+#endif
+
 // LL_spARCH
 double LL_spARCH(Eigen::VectorXd pars, List param);
 RcppExport SEXP _spGARCH_LL_spARCH(SEXP parsSEXP, SEXP paramSEXP) {
@@ -115,17 +120,60 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// Simulation_CPP_LOG
+Eigen::VectorXd Simulation_CPP_LOG(Eigen::VectorXd eps, Eigen::MappedSparseMatrix<double> Wsparse, double alpha_0, double alpha_1);
+RcppExport SEXP _spGARCH_Simulation_CPP_LOG(SEXP epsSEXP, SEXP WsparseSEXP, SEXP alpha_0SEXP, SEXP alpha_1SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type eps(epsSEXP);
+    Rcpp::traits::input_parameter< Eigen::MappedSparseMatrix<double> >::type Wsparse(WsparseSEXP);
+    Rcpp::traits::input_parameter< double >::type alpha_0(alpha_0SEXP);
+    Rcpp::traits::input_parameter< double >::type alpha_1(alpha_1SEXP);
+    rcpp_result_gen = Rcpp::wrap(Simulation_CPP_LOG(eps, Wsparse, alpha_0, alpha_1));
+    return rcpp_result_gen;
+END_RCPP
+}
 // Simulation_CPP_E
-Eigen::VectorXd Simulation_CPP_E(Eigen::ArrayXd eps, Eigen::MappedSparseMatrix<double> Wsparse, double alpha, double b);
+Eigen::VectorXd Simulation_CPP_E(Eigen::VectorXd eps, Eigen::MappedSparseMatrix<double> Wsparse, double alpha, double b);
 RcppExport SEXP _spGARCH_Simulation_CPP_E(SEXP epsSEXP, SEXP WsparseSEXP, SEXP alphaSEXP, SEXP bSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Eigen::ArrayXd >::type eps(epsSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type eps(epsSEXP);
     Rcpp::traits::input_parameter< Eigen::MappedSparseMatrix<double> >::type Wsparse(WsparseSEXP);
     Rcpp::traits::input_parameter< double >::type alpha(alphaSEXP);
     Rcpp::traits::input_parameter< double >::type b(bSEXP);
     rcpp_result_gen = Rcpp::wrap(Simulation_CPP_E(eps, Wsparse, alpha, b));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Simulation_spGARCH_CPP
+Eigen::VectorXd Simulation_spGARCH_CPP(double alpha, Eigen::VectorXd tau, Eigen::MappedSparseMatrix<double> W1, Eigen::MappedSparseMatrix<double> W2);
+RcppExport SEXP _spGARCH_Simulation_spGARCH_CPP(SEXP alphaSEXP, SEXP tauSEXP, SEXP W1SEXP, SEXP W2SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type alpha(alphaSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type tau(tauSEXP);
+    Rcpp::traits::input_parameter< Eigen::MappedSparseMatrix<double> >::type W1(W1SEXP);
+    Rcpp::traits::input_parameter< Eigen::MappedSparseMatrix<double> >::type W2(W2SEXP);
+    rcpp_result_gen = Rcpp::wrap(Simulation_spGARCH_CPP(alpha, tau, W1, W2));
+    return rcpp_result_gen;
+END_RCPP
+}
+// d_h_d_eps_CPP
+NumericMatrix d_h_d_eps_CPP(const Eigen::VectorXd& eps, const Eigen::VectorXd& h, double alpha_scalar, Eigen::MappedSparseMatrix<double> W1, Eigen::MappedSparseMatrix<double> W2);
+RcppExport SEXP _spGARCH_d_h_d_eps_CPP(SEXP epsSEXP, SEXP hSEXP, SEXP alpha_scalarSEXP, SEXP W1SEXP, SEXP W2SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Eigen::VectorXd& >::type eps(epsSEXP);
+    Rcpp::traits::input_parameter< const Eigen::VectorXd& >::type h(hSEXP);
+    Rcpp::traits::input_parameter< double >::type alpha_scalar(alpha_scalarSEXP);
+    Rcpp::traits::input_parameter< Eigen::MappedSparseMatrix<double> >::type W1(W1SEXP);
+    Rcpp::traits::input_parameter< Eigen::MappedSparseMatrix<double> >::type W2(W2SEXP);
+    rcpp_result_gen = Rcpp::wrap(d_h_d_eps_CPP(eps, h, alpha_scalar, W1, W2));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -140,6 +188,87 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// Simulation_CPP
+Eigen::VectorXd Simulation_CPP(Eigen::VectorXd eps, Eigen::MappedSparseMatrix<double> Wsparse, double alpha);
+RcppExport SEXP _spGARCH_Simulation_CPP(SEXP epsSEXP, SEXP WsparseSEXP, SEXP alphaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type eps(epsSEXP);
+    Rcpp::traits::input_parameter< Eigen::MappedSparseMatrix<double> >::type Wsparse(WsparseSEXP);
+    Rcpp::traits::input_parameter< double >::type alpha(alphaSEXP);
+    rcpp_result_gen = Rcpp::wrap(Simulation_CPP(eps, Wsparse, alpha));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Simulation_CPP_LOG
+Eigen::VectorXd Simulation_CPP_LOG(Eigen::VectorXd eps, Eigen::MappedSparseMatrix<double> Wsparse, double alpha_0, double alpha_1);
+RcppExport SEXP _spGARCH_Simulation_CPP_LOG(SEXP epsSEXP, SEXP WsparseSEXP, SEXP alpha_0SEXP, SEXP alpha_1SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type eps(epsSEXP);
+    Rcpp::traits::input_parameter< Eigen::MappedSparseMatrix<double> >::type Wsparse(WsparseSEXP);
+    Rcpp::traits::input_parameter< double >::type alpha_0(alpha_0SEXP);
+    Rcpp::traits::input_parameter< double >::type alpha_1(alpha_1SEXP);
+    rcpp_result_gen = Rcpp::wrap(Simulation_CPP_LOG(eps, Wsparse, alpha_0, alpha_1));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Simulation_CPP_E
+Eigen::VectorXd Simulation_CPP_E(Eigen::VectorXd eps, Eigen::MappedSparseMatrix<double> Wsparse, double alpha, double b);
+RcppExport SEXP _spGARCH_Simulation_CPP_E(SEXP epsSEXP, SEXP WsparseSEXP, SEXP alphaSEXP, SEXP bSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type eps(epsSEXP);
+    Rcpp::traits::input_parameter< Eigen::MappedSparseMatrix<double> >::type Wsparse(WsparseSEXP);
+    Rcpp::traits::input_parameter< double >::type alpha(alphaSEXP);
+    Rcpp::traits::input_parameter< double >::type b(bSEXP);
+    rcpp_result_gen = Rcpp::wrap(Simulation_CPP_E(eps, Wsparse, alpha, b));
+    return rcpp_result_gen;
+END_RCPP
+}
+// Simulation_spGARCH_CPP
+Eigen::VectorXd Simulation_spGARCH_CPP(double alpha, Eigen::VectorXd tau, Eigen::MappedSparseMatrix<double> W1, Eigen::MappedSparseMatrix<double> W2);
+RcppExport SEXP _spGARCH_Simulation_spGARCH_CPP(SEXP alphaSEXP, SEXP tauSEXP, SEXP W1SEXP, SEXP W2SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type alpha(alphaSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type tau(tauSEXP);
+    Rcpp::traits::input_parameter< Eigen::MappedSparseMatrix<double> >::type W1(W1SEXP);
+    Rcpp::traits::input_parameter< Eigen::MappedSparseMatrix<double> >::type W2(W2SEXP);
+    rcpp_result_gen = Rcpp::wrap(Simulation_spGARCH_CPP(alpha, tau, W1, W2));
+    return rcpp_result_gen;
+END_RCPP
+}
+// asdgCMatrix
+SEXP asdgCMatrix(SEXP IN);
+RcppExport SEXP _spGARCH_asdgCMatrix(SEXP INSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type IN(INSEXP);
+    rcpp_result_gen = Rcpp::wrap(asdgCMatrix(IN));
+    return rcpp_result_gen;
+END_RCPP
+}
+// d_h_d_eps_CPP
+NumericMatrix d_h_d_eps_CPP(const Eigen::VectorXd& eps, const Eigen::VectorXd& h, double alpha_scalar, Eigen::MappedSparseMatrix<double> W1, Eigen::MappedSparseMatrix<double> W2);
+RcppExport SEXP _spGARCH_d_h_d_eps_CPP(SEXP epsSEXP, SEXP hSEXP, SEXP alpha_scalarSEXP, SEXP W1SEXP, SEXP W2SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Eigen::VectorXd& >::type eps(epsSEXP);
+    Rcpp::traits::input_parameter< const Eigen::VectorXd& >::type h(hSEXP);
+    Rcpp::traits::input_parameter< double >::type alpha_scalar(alpha_scalarSEXP);
+    Rcpp::traits::input_parameter< Eigen::MappedSparseMatrix<double> >::type W1(W1SEXP);
+    Rcpp::traits::input_parameter< Eigen::MappedSparseMatrix<double> >::type W2(W2SEXP);
+    rcpp_result_gen = Rcpp::wrap(d_h_d_eps_CPP(eps, h, alpha_scalar, W1, W2));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_spGARCH_LL_spARCH", (DL_FUNC) &_spGARCH_LL_spARCH, 2},
@@ -151,8 +280,17 @@ static const R_CallMethodDef CallEntries[] = {
     {"_spGARCH_LL_SARspARCHX", (DL_FUNC) &_spGARCH_LL_SARspARCHX, 2},
     {"_spGARCH_LL_SAREspARCHX", (DL_FUNC) &_spGARCH_LL_SAREspARCHX, 2},
     {"_spGARCH_Simulation_CPP", (DL_FUNC) &_spGARCH_Simulation_CPP, 3},
+    {"_spGARCH_Simulation_CPP_LOG", (DL_FUNC) &_spGARCH_Simulation_CPP_LOG, 4},
     {"_spGARCH_Simulation_CPP_E", (DL_FUNC) &_spGARCH_Simulation_CPP_E, 4},
+    {"_spGARCH_Simulation_spGARCH_CPP", (DL_FUNC) &_spGARCH_Simulation_spGARCH_CPP, 4},
+    {"_spGARCH_d_h_d_eps_CPP", (DL_FUNC) &_spGARCH_d_h_d_eps_CPP, 5},
     {"_spGARCH_asdgCMatrix", (DL_FUNC) &_spGARCH_asdgCMatrix, 1},
+    {"_spGARCH_Simulation_CPP", (DL_FUNC) &_spGARCH_Simulation_CPP, 3},
+    {"_spGARCH_Simulation_CPP_LOG", (DL_FUNC) &_spGARCH_Simulation_CPP_LOG, 4},
+    {"_spGARCH_Simulation_CPP_E", (DL_FUNC) &_spGARCH_Simulation_CPP_E, 4},
+    {"_spGARCH_Simulation_spGARCH_CPP", (DL_FUNC) &_spGARCH_Simulation_spGARCH_CPP, 4},
+    {"_spGARCH_asdgCMatrix", (DL_FUNC) &_spGARCH_asdgCMatrix, 1},
+    {"_spGARCH_d_h_d_eps_CPP", (DL_FUNC) &_spGARCH_d_h_d_eps_CPP, 5},
     {NULL, NULL, 0}
 };
 
