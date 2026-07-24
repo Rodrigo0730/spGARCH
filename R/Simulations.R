@@ -305,17 +305,15 @@ sim.spGARCH_batch <- function(n_sim = 1, ..., seed = NULL, workers = 1) {
       theta,
       zeta,
       b,
-      W_1,
-      W_2,
-      rho,
-      lambda
+      rhoW_1,
+      lambdaW_2
     ) {
       .d_h_d_eps_CPP(
         as.numeric(eps),
         as.numeric(h),
         as.numeric(alpha),
-        W_1,
-        W_2
+        rhoW_1,
+        lambdaW_2
       )
     }
   } else if (model == "log-spGARCH") {
@@ -344,17 +342,13 @@ sim.spGARCH_batch <- function(n_sim = 1, ..., seed = NULL, workers = 1) {
       theta,
       zeta,
       b,
-      W_1,
-      W_2,
-      rho,
-      lambda
+      rhoW_1,
+      lambdaW_2
     ) {
       tau_eps_prime <- function(eps) {
         return(2 / eps)
       }
       n <- length(eps)
-      rhoW_1 <- rho * W_1
-      lambdaW_2 <- lambda * W_2
       aux <- solve(Matrix::Diagonal(n) - rhoW_1 - lambdaW_2, rhoW_1)
       eps_j <- t(array(rep(eps, n), dim = c(n, n)))
       h_i <- array(rep(h, n), dim = c(n, n))
@@ -385,14 +379,10 @@ sim.spGARCH_batch <- function(n_sim = 1, ..., seed = NULL, workers = 1) {
       theta,
       zeta,
       b,
-      W_1,
-      W_2,
-      rho,
-      lambda
+      rhoW_1,
+      lambdaW_2
     ) {
       n <- length(eps)
-      rhoW_1 <- rho * W_1
-      lambdaW_2 <- lambda * W_2
       M <- Matrix::Diagonal(n) - lambdaW_2
       aux <- as.matrix(solve(M, rhoW_1))
       eps_j <- t(array(rep(eps, n), dim = c(n, n)))
@@ -429,14 +419,10 @@ sim.spGARCH_batch <- function(n_sim = 1, ..., seed = NULL, workers = 1) {
       theta,
       zeta,
       b,
-      W_1,
-      W_2,
-      rho,
-      lambda
+      rhoW_1,
+      lambdaW_2
     ) {
       n <- length(eps)
-      rhoW_1 <- rho * W_1
-      lambdaW_2 <- lambda * W_2
       M <- Matrix::Diagonal(n) - rhoW_1 - lambdaW_2
       aux <- as.matrix(solve(M, rhoW_1))
       eps_j <- t(array(rep(eps, n), dim = c(n, n)))
