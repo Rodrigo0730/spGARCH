@@ -30,7 +30,7 @@ sim.spARCH <- function(
     con$seed <- seed
   }
 
-  if (!is.element(type, c("spARCH", "log-spARCH", "complex-spARCH"))) {
+  if (!is.element(type, c("spARCH", "log-spARCH", "e-spARCH", "complex-spARCH"))) {
     stop("invalid type: ", type)
   }
 
