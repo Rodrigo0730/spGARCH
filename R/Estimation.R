@@ -1043,6 +1043,61 @@ plot.spARCH <- function(
   return((-1) * (sum(log(dnorm(eps))) - log(det_J)))
 }
 
+##################################################
+#
+# Non-Linear Least Squares Estimation for spGARCH
+#
+##################################################
+
+nlse.spGARCH <- function(y, W1, W2, start = c(1, 0.5, 0.5), control = list()) {
+  con <- list(trace = 1, outer.iter = 400, inner.iter = 800, tol = 1.0e-8)
+  con[names(control)] <- control
+
+  if (!inherits(W1, "dgCMatrix")) {
+    W1 <- .asdgCMatrix(as.matrix(W1))
+  }
+  if (!inherits(W2, "dgCMatrix")) {
+    W2 <- .asdgCMatrix(as.matrix(W2))
+  }
+
+  param <- list(y = as.numeric(y), W1 = W1, W2 = W2)
+
+  LB <- c(1e-6, 0, 0)
+  UB <- c(Inf, 0.999, 0.999)
+
+  obj_fun <- function(pars) {
+    .NLSE_spGARCH(pars, param)
+  }
+
+  opt <- solnp(pars = start, fun = obj_fun, LB = LB, UB = UB, control = con)
+
+  if (opt$convergence != 0) {
+    warning("Iterative minimization did not converge.\n")
+  }
+
+  alpha_hat <- opt$pars[1]
+  rho_hat <- opt$pars[2]
+  lambda_hat <- opt$pars[3]
+
+  n <- length(y)
+  M <- Matrix::Diagonal(n) - lambda_hat * W2
+  rhs <- rep(alpha_hat, n) + rho_hat * as.numeric(W1 %*% (y^2))
+  h_hat <- as.numeric(solve(M, rhs))
+
+  residuals <- y / sqrt(h_hat)
+
+  out <- list(
+    coefficients = c(alpha = alpha_hat, rho = rho_hat, lambda = lambda_hat),
+    residuals = residuals,
+    h = h_hat,
+    SSE = opt$values[length(opt$values)],
+    opt_details = opt
+  )
+
+  class(out) <- "spGARCH_nlse"
+  return(out)
+}
+
 #
 # .LL_spARCHX_r <- function(pars, param){
 #   # spARCH coefficients
