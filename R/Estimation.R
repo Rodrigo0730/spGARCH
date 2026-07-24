@@ -1198,15 +1198,23 @@ gmm.stARCH <- function(Y, W, p = 1, control = list()) {
   Y_star <- Y_star_full[, 2:Total_Time]
   Y_star_lag <- Y_star_full[, 1:T_obs]
 
-  F_T <- matrix(0, nrow = T_obs, ncol = T_obs - 1)
-  for (t in 1:(T_obs - 1)) {
-    c_t <- sqrt((T_obs - t) / (T_obs - t + 1))
-    F_T[t, t] <- c_t
-    F_T[(t + 1):T_obs, t] <- -c_t / (T_obs - t)
+  helmert <- function(M) {
+    T_cols <- ncol(M)
+    T_out <- T_cols - 1
+    S <- M
+    for (t in (T_cols - 1):1) {
+      S[, t] <- S[, t] + S[, t + 1]
+    }
+    R <- matrix(0, n, T_out)
+    for (t in 1:T_out) {
+      ct <- sqrt((T_cols - t) / (T_cols - t + 1))
+      R[, t] <- ct * (M[, t] - S[, t + 1] / (T_cols - t))
+    }
+    R
   }
 
-  Y_star_transformed <- Y_star %*% F_T
-  Y_star_lag_transformed <- Y_star_lag %*% F_T
+  Y_star_transformed <- helmert(Y_star)
+  Y_star_lag_transformed <- helmert(Y_star_lag)
 
   J_n <- diag(n) - matrix(1 / n, nrow = n, ncol = n)
 
