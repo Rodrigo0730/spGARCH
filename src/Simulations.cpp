@@ -3,26 +3,23 @@ using namespace Rcpp;
 using namespace Eigen;
 
 // [[Rcpp::export(".Simulation_CPP")]]
-Eigen::VectorXd Simulation_CPP (Eigen::VectorXd eps,
-                                  Eigen::MappedSparseMatrix<double> Wsparse,
-                                  double alpha)
-{
+Eigen::VectorXd Simulation_CPP(Eigen::VectorXd eps, Eigen::MappedSparseMatrix<double> Wsparse, double alpha) {
   int n = eps.size();
+  VectorXd eps_sq = eps.cwiseProduct(eps);
 
-  VectorXd eps_sq = eps.array().square();
-  VectorXd eta    = alpha * eps_sq;
+  SparseMatrix<double> I(n, n);
+  I.setIdentity();
 
-  SparseMatrix<double> A = eps_sq.asDiagonal() * Wsparse;
-
-  SparseMatrix<double> I_minus_A(n, n);
-  I_minus_A.setIdentity();
-  I_minus_A -= A;
+  SparseMatrix<double> M = I - Wsparse * eps_sq.asDiagonal();
 
   SparseLU<SparseMatrix<double>> solver;
-  solver.compute(I_minus_A);
-  VectorXd temp = solver.solve(eta);
+  solver.compute(M);
+  if(solver.info() != Success) {
+    stop("Matrix M is singular.");
+  }
 
-  VectorXd h = alpha * VectorXd::Ones(n) + Wsparse * temp;
+  VectorXd alpha_vec = alpha * VectorXd::Ones(n);
+  VectorXd h = solver.solve(alpha_vec);
 
   return h;
 }
