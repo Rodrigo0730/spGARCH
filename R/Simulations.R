@@ -48,10 +48,10 @@ sim.spARCH <- function(
   if (n < 1) {
     stop("n must be greater than 1 \n")
   }
-  if (dim(W)[1] != dim(W)[2]) {
+  if (nrow(W) != ncol(W)) {
     stop("Spatial weight matrix W must be quadratic \n")
   }
-  if (n != dim(W)[1]) {
+  if (n != nrow(W)) {
     stop("Spatial weight matrix W must have dimension n x n \n")
   }
   if (!inherits(W, "dgCMatrix")) {
@@ -179,20 +179,11 @@ sim.spGARCH <- function(
   if (n < 1) {
     stop("n must be greater than 1 \n")
   }
-  if (dim(W1)[1] != dim(W1)[2]) {
-    stop("Spatial weight matrix W1 must be quadratic \n")
+  if (nrow(W1) != ncol(W1) || nrow(W2) != ncol(W2)) {
+    stop("Spatial weight matrices must be quadratic \n")
   }
-  if (n != dim(W1)[1]) {
-    stop("Spatial weight matrix W1 must have dimension n x n \n")
-  }
-  if (dim(W2)[1] != dim(W2)[2]) {
-    stop("Spatial weight matrix W2 must be quadratic \n")
-  }
-  if (n != dim(W2)[1]) {
-    stop("Spatial weight matrix W2 must have dimension n x n \n")
-  }
-  if (dim(W2)[1] != dim(W1)[1] | dim(W2)[2] != dim(W1)[2]) {
-    stop("Spatial weight matrices W1 and W2 must have equal dimensions \n")
+  if (n != nrow(W1) || n != nrow(W2)) {
+    stop("Spatial weight matrices must have dimension n x n \n")
   }
   if (!inherits(W1, "dgCMatrix")) {
     W1 <- methods::as(W1, "dgCMatrix")
