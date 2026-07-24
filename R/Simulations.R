@@ -53,10 +53,9 @@ sim.spARCH <- function(
     stop("Spatial weight matrix W must have dimension n x n \n")
   }
   if (!inherits(W, "dgCMatrix")) {
-    W <- .asdgCMatrix(rho * as.matrix(W))
-  } else {
-    W <- rho * W
+    W <- methods::as(W, "dgCMatrix")
   }
+  W <- rho * W
 
   set.seed(con$seed)
 
@@ -187,15 +186,13 @@ sim.spGARCH <- function(
     stop("Spatial weight matrices W1 and W2 must have equal dimensions \n")
   }
   if (!inherits(W1, "dgCMatrix")) {
-    W1 <- .asdgCMatrix(rho * as.matrix(W1))
-  } else {
-    W1 <- rho * W1
+    W1 <- methods::as(W1, "dgCMatrix")
   }
+  W1 <- rho * W1
   if (!inherits(W2, "dgCMatrix")) {
-    W2 <- .asdgCMatrix(lambda * as.matrix(W2))
-  } else {
-    W2 <- lambda * W2
+    W2 <- methods::as(W2, "dgCMatrix")
   }
+  W2 <- lambda * W2
 
   set.seed(con$seed)
 
