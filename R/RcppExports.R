@@ -33,6 +33,14 @@
     .Call('_spGARCH_LL_SAREspARCHX', PACKAGE = 'spGARCH', pars, param)
 }
 
+.NLSE_spGARCH <- function(pars, param) {
+    .Call('_spGARCH_NLSE_spGARCH', PACKAGE = 'spGARCH', pars, param)
+}
+
+.GMM_stARCH_CPP <- function(par, Y_vec, Y_lag_vec, W, P, Q) {
+    .Call('_spGARCH_GMM_stARCH_CPP', PACKAGE = 'spGARCH', par, Y_vec, Y_lag_vec, W, P, Q)
+}
+
 .Simulation_CPP <- function(eps, Wsparse, alpha) {
     .Call('_spGARCH_Simulation_CPP', PACKAGE = 'spGARCH', eps, Wsparse, alpha)
 }
@@ -55,29 +63,5 @@
 
 .asdgCMatrix <- function(IN) {
     .Call('_spGARCH_asdgCMatrix', PACKAGE = 'spGARCH', IN)
-}
-
-.Simulation_CPP <- function(eps, Wsparse, alpha) {
-    .Call('_spGARCH_Simulation_CPP', PACKAGE = 'spGARCH', eps, Wsparse, alpha)
-}
-
-.Simulation_CPP_LOG <- function(eps, Wsparse, alpha_0, alpha_1) {
-    .Call('_spGARCH_Simulation_CPP_LOG', PACKAGE = 'spGARCH', eps, Wsparse, alpha_0, alpha_1)
-}
-
-.Simulation_CPP_E <- function(eps, Wsparse, alpha, b) {
-    .Call('_spGARCH_Simulation_CPP_E', PACKAGE = 'spGARCH', eps, Wsparse, alpha, b)
-}
-
-.Simulation_spGARCH_CPP <- function(alpha, tau, W1, W2) {
-    .Call('_spGARCH_Simulation_spGARCH_CPP', PACKAGE = 'spGARCH', alpha, tau, W1, W2)
-}
-
-.asdgCMatrix <- function(IN) {
-    .Call('_spGARCH_asdgCMatrix', PACKAGE = 'spGARCH', IN)
-}
-
-.d_h_d_eps_CPP <- function(eps, h, alpha_scalar, W1, W2) {
-    .Call('_spGARCH_d_h_d_eps_CPP', PACKAGE = 'spGARCH', eps, h, alpha_scalar, W1, W2)
 }
 
