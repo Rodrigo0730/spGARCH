@@ -125,11 +125,10 @@ B <- W
 
 X <- cbind(rep(1, n), rnorm(n))
 beta <- c(5, 2)
-
-y <- solve(diag(n) - lambda * B) \%*\%
-    (sim.spARCH(n = n, rho = rho, alpha = alpha, W = W, type = "log-spARCH") + X \%*\% beta)
-y <- as.vector(y)
-out <- qml.SARspARCH(y ~ X[,2], B = B, W = W, type = "log-spARCH")
+x2 <- X[, 2]
+df <- data.frame(y = as.vector(solve(diag(n) - lambda * B) \%*\%
+    (sim.spARCH(n = n, rho = rho, alpha = alpha, W = W, type = "log-spARCH") + X \%*\% beta)), x2 = x2)
+out <- qml.SARspARCH(y ~ x2, B = B, W = W, data = df, type = "log-spARCH")
 
 summary(out)
 }
