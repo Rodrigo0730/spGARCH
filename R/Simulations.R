@@ -293,7 +293,10 @@ sim.spGARCH_batch <- function(n_sim = 1, ..., seed = NULL, workers = 1) {
     }
     g <- function(y, alpha, rhoW_1, lambdaW_2, theta, zeta, b, tau_y, f_inv) {
       n <- length(y)
-      X <- solve(Matrix::Diagonal(n) - lambdaW_2, alpha + rhoW_1 %*% tau_y(y))
+      X <- as.numeric(solve(
+        Matrix::Diagonal(n) - lambdaW_2,
+        alpha + as.numeric(rhoW_1 %*% tau_y(y))
+      ))
       eps <- y / sqrt(as.vector(f_inv(X)))
       return(list(eps = eps, h = f_inv(X)))
     }
