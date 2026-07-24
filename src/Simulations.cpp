@@ -60,6 +60,26 @@ Eigen::VectorXd Simulation_CPP_E(Eigen::VectorXd eps, Eigen::MappedSparseMatrix<
 
 
 
+// [[Rcpp::export(".Simulation_spGARCH_CPP")]]
+Eigen::VectorXd Simulation_spGARCH_CPP(double alpha, Eigen::VectorXd tau, Eigen::MappedSparseMatrix<double> W1, Eigen::MappedSparseMatrix<double> W2) {
+  int n = tau.size();
+
+  SparseMatrix<double> I(n, n);
+  I.setIdentity();
+  SparseMatrix<double> I_minus_W2 = I - W2;
+
+  SparseLU<SparseMatrix<double>> solver;
+  solver.compute(I_minus_W2);
+  if(solver.info() != Success) {
+    stop("Matrix I - W2 is computationally singular.");
+  }
+
+  VectorXd rhs = alpha * VectorXd::Ones(n) + W1 * tau;
+  VectorXd X = solver.solve(rhs);
+
+  return X;
+}
+
 // [[Rcpp::export(".asdgCMatrix")]]
 SEXP asdgCMatrix( SEXP IN ){
   // Søren Højsgaard
