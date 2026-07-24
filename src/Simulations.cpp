@@ -27,6 +27,28 @@ Eigen::VectorXd Simulation_CPP (Eigen::VectorXd eps,
   return h;
 }
 
+// [[Rcpp::export(".Simulation_CPP_LOG")]]
+Eigen::VectorXd Simulation_CPP_LOG(Eigen::VectorXd eps, Eigen::MappedSparseMatrix<double> Wsparse, double alpha_0, double alpha_1) {
+    int n = eps.size();
+
+    VectorXd log_eps2 = eps.array().square().log().matrix();
+
+    SparseMatrix<double> I(n, n);
+    I.setIdentity();
+    SparseMatrix<double> M = I - alpha_1 * Wsparse;
+
+    SparseLU<SparseMatrix<double>> solver;
+    solver.compute(M);
+    if(solver.info() != Success) {
+        Rcpp::stop("Matrix (I - alpha_1 * W) is computationally singular in log-spARCH.");
+    }
+
+    VectorXd rhs = alpha_0 * VectorXd::Ones(n) + alpha_1 * Wsparse * log_eps2;
+    VectorXd log_h = solver.solve(rhs);
+    VectorXd Y = log_h.array().exp().sqrt().matrix().cwiseProduct(eps);
+    return Y;
+}
+
 // [[Rcpp::export(".Simulation_CPP_E")]]
 Eigen::VectorXd Simulation_CPP_E (Eigen::ArrayXd eps, Eigen::MappedSparseMatrix<double> Wsparse, double alpha, double b)
 {
