@@ -357,51 +357,28 @@ sim.spGARCH_batch <- function(n_sim = 1, ..., seed = NULL, workers = 1) {
       return(exp(x))
     }
     tau_eps <- function(eps, W_1, W_2, alpha, theta, zeta, b) {
-      # function tau in paper
       return(theta * eps)
     }
     tau_y <- function(y) {
-      return(NULL)
+      return(log(abs(y)))
     }
     g <- function(y, alpha, rhoW_1, lambdaW_2, theta, zeta, b, tau_y, f_inv) {
-      # mapping from y to eps
       n <- length(y)
-      function_y_eps <- function(x, y, alpha, rhoW_1, lambdaW_2, theta, zeta) {
-        n <- length(x)
-        eps <- x
-        return(
-          (diag(n) - lambdaW_2) %*%
-            log(abs(y)^2) -
-            alpha -
-            (rhoW_1 %*%
-              (theta * eps) +
-              (diag(n) - lambdaW_2) %*% log(abs(eps)^2))
-        )
-      }
-      out <- nleqslv(
-        x = y,
-        fn = function_y_eps,
-        alpha = alpha,
-        rhoW_1 = rhoW_1,
-        lambdaW_2 = lambdaW_2,
-        theta = theta,
-        zeta = zeta,
-        y = y,
-        control = list(ftol = 1e-10)
-      )
-      eps <- out$x
-      X <- log(abs(y)^2) - log(abs(eps)^2)
+      M <- Matrix::Diagonal(n) - lambdaW_2 + (b / 2) * rhoW_1
+      rhs <- rep(alpha, n) + as.numeric(rhoW_1 %*% (b * tau_y(y)))
+      X <- as.numeric(solve(M, rhs))
+      eps <- y / sqrt(as.vector(f_inv(X)))
       return(list(eps = eps, h = f_inv(X)))
     }
-    d_h_d_eps <- function(eps, h, alpha, theta, zeta, b, rhoW_1, lambdaW_2) {
-      tau_eps_prime <- function(eps, theta) {
-        return(theta) # Achtung evtl. zu ändern, hard coded!
-      }
+    d_h_d_eps <- function(eps, h, alpha, theta, zeta, b, W_1, W_2, rho, lambda) {
       n <- length(eps)
-      aux <- solve(diag(n) - Matrix(lambdaW_2)) %*% Matrix(rhoW_1)
+      rhoW_1 <- rho * W_1
+      lambdaW_2 <- lambda * W_2
+      M <- Matrix::Diagonal(n) - lambdaW_2
+      aux <- as.matrix(solve(M, rhoW_1))
       eps_j <- t(array(rep(eps, n), dim = c(n, n)))
       h_i <- array(rep(h, n), dim = c(n, n))
-      return(aux * tau_eps_prime(eps_j, theta) * h_i)
+      return(b * aux / eps_j * h_i)
     }
   } else if (model == "h-spGARCH") {
     f_inv <- function(x) {
