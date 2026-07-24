@@ -453,3 +453,115 @@ sim.spGARCH_batch <- function(n_sim = 1, ..., seed = NULL, workers = 1) {
     d_h_d_eps = d_h_d_eps
   ))
 }
+
+##################################################
+#
+# Simulation of spatiotemporal ARCH and GARCH models
+# as in Otto et al. 2025
+#
+##################################################
+
+sim.stARCH <- function(
+  n = nrow(W),
+  TT,
+  rho,
+  gamma,
+  delta,
+  alpha,
+  W,
+  control = list()
+) {
+  con <- list(seed = NULL, burnin = 50)
+  con[names(control)] <- control
+
+  if (!is.null(con$seed)) {
+    set.seed(con$seed)
+  }
+  if (!inherits(W, "dgCMatrix")) {
+    W <- methods::as(W, "dgCMatrix")
+  }
+
+  Total_T <- TT + con$burnin
+
+  eps <- matrix(rnorm(n * Total_T), nrow = n, ncol = Total_T)
+  log_eps2 <- log(eps^2)
+
+  log_Y2 <- matrix(0, nrow = n, ncol = Total_T)
+  h_star <- matrix(0, nrow = n, ncol = Total_T)
+  Y <- matrix(0, nrow = n, ncol = Total_T)
+
+  I_n <- Matrix::Diagonal(n)
+  A <- I_n - rho * W
+
+  h_star[, 1] <- alpha
+  Y[, 1] <- exp(h_star[, 1] / 2) * eps[, 1]
+  log_Y2[, 1] <- log_eps2[, 1] + h_star[, 1]
+
+  for (t in 2:Total_T) {
+    rhs <- alpha +
+      rho * (W %*% log_eps2[, t]) +
+      gamma * log_Y2[, t - 1] +
+      delta * (W %*% log_Y2[, t - 1])
+
+    h_star[, t] <- as.numeric(Matrix::solve(A, rhs))
+    Y[, t] <- exp(h_star[, t] / 2) * eps[, t]
+    log_Y2[, t] <- h_star[, t] + log_eps2[, t]
+  }
+
+  Y_out <- Y[, (con$burnin + 1):Total_T]
+  return(Y_out)
+}
+
+
+sim.stGARCH <- function(
+  n = nrow(W),
+  TT,
+  rho,
+  gamma,
+  delta,
+  beta,
+  alpha,
+  W,
+  control = list()
+) {
+  con <- list(seed = NULL, burnin = 50)
+  con[names(control)] <- control
+
+  if (!is.null(con$seed)) {
+    set.seed(con$seed)
+  }
+  if (!inherits(W, "dgCMatrix")) {
+    W <- methods::as(W, "dgCMatrix")
+  }
+
+  Total_T <- TT + con$burnin
+
+  eps <- matrix(rnorm(n * Total_T), nrow = n, ncol = Total_T)
+  log_eps2 <- log(eps^2)
+
+  log_Y2 <- matrix(0, nrow = n, ncol = Total_T)
+  h_star <- matrix(0, nrow = n, ncol = Total_T)
+  Y <- matrix(0, nrow = n, ncol = Total_T)
+
+  I_n <- Matrix::Diagonal(n)
+  A <- I_n - rho * W
+
+  h_star[, 1] <- alpha
+  Y[, 1] <- exp(h_star[, 1] / 2) * eps[, 1]
+  log_Y2[, 1] <- log_eps2[, 1] + h_star[, 1]
+
+  for (t in 2:Total_T) {
+    rhs <- alpha +
+      rho * (W %*% log_eps2[, t]) +
+      gamma * log_Y2[, t - 1] +
+      delta * (W %*% log_Y2[, t - 1]) +
+      beta * h_star[, t - 1]
+
+    h_star[, t] <- as.numeric(Matrix::solve(A, rhs))
+    Y[, t] <- exp(h_star[, t] / 2) * eps[, t]
+    log_Y2[, t] <- h_star[, t] + log_eps2[, t]
+  }
+
+  Y_out <- Y[, (con$burnin + 1):Total_T]
+  return(Y_out)
+}
