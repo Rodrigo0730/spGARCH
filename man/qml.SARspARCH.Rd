@@ -113,7 +113,7 @@ see also: \code{\link{solnp}}
 \code{\link[Rsolnp]{solnp}} (package \code{\link[Rsolnp]{Rsolnp}})
 }
 \examples{
-\donttest{
+\dontrun{
 require("spdep")
 rho <- 0.5
 alpha <- 1
