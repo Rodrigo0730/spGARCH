@@ -86,6 +86,8 @@ sim.spARCH <- function(
     )
   }
   if (type == "log-spARCH") {
+    return(.Simulation_CPP_LOG(eps, W, alpha, b))
+  } else if (type == "e-spARCH") {
     return(.Simulation_CPP_E(eps, W, alpha, b))
   }
   h <- .Simulation_CPP(eps, W, alpha)
