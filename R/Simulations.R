@@ -61,10 +61,10 @@ sim.spARCH <- function(
 
   if (type == "spARCH") {
     if (!con$triangular) {
-      eigen_values <- eigen(W, only.values = TRUE)$values
-      if (any(eigen_values != 0)) {
-        a <- 1 / sqrt(sqrt(norm(W %*% W, "1")))
-        eps <- rtruncnorm(n, a = -a, b = a)
+      W_norm <- norm(W, "1")
+      if (W_norm > 1e-12) {
+        a <- 1 / sqrt(W_norm)
+        eps <- truncnorm::rtruncnorm(n, a = -a, b = a)
       } else {
         eps <- rnorm(n)
       }
