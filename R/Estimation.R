@@ -233,6 +233,7 @@ qml.spGARCH <- function(
   model_terms <- attr(model_frame, "terms")
   y <- model.response(model_frame)
   X <- model.matrix(model_terms, model_frame)
+  X <- X[, -1, drop = FALSE]
 
   if (length(dim(y)) > 0 | !is(y, "numeric") | mode(y) != "numeric") {
     stop("y must be a numeric vector \n")
@@ -309,7 +310,7 @@ qml.spGARCH <- function(
       control = con
     )
   } else if (dim(X)[2] > 0) {
-    # to do: spGARCH models with regressors
+    stop("spGARCH models with regressors are not yet implemented")
   } else {
     stop("X must be a matrix")
   }
