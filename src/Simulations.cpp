@@ -50,31 +50,12 @@ Eigen::VectorXd Simulation_CPP_LOG(Eigen::VectorXd eps, Eigen::MappedSparseMatri
 }
 
 // [[Rcpp::export(".Simulation_CPP_E")]]
-Eigen::VectorXd Simulation_CPP_E (Eigen::ArrayXd eps, Eigen::MappedSparseMatrix<double> Wsparse, double alpha, double b)
-{
-  // ---------------- //
-  //   Declarations   //
-  // ---------------- //
-
-  int n = eps.size();
-  ArrayXd abs_eps_b(n);
-  VectorXd g_eps(n);
-  VectorXd Y(n);
-  ArrayXd h(n);
-  ArrayXd hexp(n);
-  // ---------------- //
-  //   Computations   //
-  // ---------------- //
-
-  abs_eps_b = pow(eps.abs(), b);
-  g_eps = abs_eps_b.log();
-
-  h = alpha * VectorXd::Ones(n) + Wsparse * g_eps;
-  hexp = h.exp();
-
-  Y = hexp.sqrt() * eps;
-
-  return Y;
+Eigen::VectorXd Simulation_CPP_E(Eigen::VectorXd eps, Eigen::MappedSparseMatrix<double> Wsparse, double alpha, double b) {
+    int n = eps.size();
+    VectorXd g_eps = (b * eps.array().abs().log()).matrix();
+    VectorXd ln_h = alpha * VectorXd::Ones(n) + Wsparse * g_eps;
+    VectorXd Y = ln_h.array().exp().sqrt().matrix().cwiseProduct(eps);
+    return Y;
 }
 
 
