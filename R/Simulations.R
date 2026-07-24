@@ -285,41 +285,29 @@ sim.spGARCH_batch <- function(n_sim = 1, ..., seed = NULL, workers = 1) {
       return(x)
     }
     tau_eps <- function(eps, W_1, W_2, alpha, theta, zeta, b) {
-      # function tau in paper
       eps_2 <- eps^2
       n <- length(eps)
-      return(
-        diag(eps_2) %*%
-          Matrix::solve(
-            Matrix::Diagonal(n) - Matrix(W_1) %*% diag(eps_2) - Matrix(W_2)
-          ) %*%
-          alpha
-      )
+      A <- diag(n) - W_1 %*% diag(eps_2) - W_2
+      return(as.numeric(solve(A, rep(as.numeric(alpha), n))))
     }
     tau_y <- function(y) {
       return(y^2)
     }
     g <- function(y, alpha, rhoW_1, lambdaW_2, theta, zeta, b, tau_y, f_inv) {
-      # mapping from y to eps
       n <- length(y)
-      X <- solve(diag(n) - Matrix(lambdaW_2)) %*%
-        (alpha + Matrix(rhoW_1) %*% tau_y(y))
+      X <- solve(Matrix::Diagonal(n) - lambdaW_2, alpha + rhoW_1 %*% tau_y(y))
       eps <- y / sqrt(as.vector(f_inv(X)))
       return(list(eps = eps, h = f_inv(X)))
     }
-    # sourceCpp("Cpp_Functions.cpp")
 
-    d_h_d_eps <- function(eps, h, alpha, theta, zeta, b, rhoW_1, lambdaW_2) {
-      n <- length(eps)
-      aux <- solve(diag(n) - rhoW_1 %*% diag(as.vector(eps^2)) - lambdaW_2)
-      result <- array(, dim = c(n, n))
-      for (j in 1:n) {
-        aux_rhoW_1 <- rhoW_1
-        aux_rhoW_1[, -j] <- array(0, dim = c(n, n - 1))
-        eps_j <- eps[j]
-        result[, j] <- 2 * eps_j * aux %*% aux_rhoW_1 %*% aux %*% alpha
-      }
-      return(result)
+    d_h_d_eps <- function(eps, h, alpha, theta, zeta, b, W_1, W_2, rho, lambda) {
+      .d_h_d_eps_CPP(
+        as.numeric(eps),
+        as.numeric(h),
+        as.numeric(alpha),
+        W_1,
+        W_2
+      )
     }
   } else if (model == "log-spGARCH") {
     f_inv <- function(x) {
