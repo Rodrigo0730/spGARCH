@@ -7,7 +7,7 @@
 # spatial ARCH process
 
 sim.spARCH <- function(
-  n = dim(W)[1],
+  n = nrow(W),
   rho,
   alpha,
   W,
@@ -124,7 +124,7 @@ sim.spARCH_batch <- function(n_sim = 1, ..., seed = NULL, workers = 1) {
 
 
 sim.spGARCH <- function(
-  n = dim(W1)[1],
+  n = nrow(W1),
   rho,
   lambda,
   alpha,
