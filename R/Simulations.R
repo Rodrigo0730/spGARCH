@@ -196,6 +196,16 @@ sim.spGARCH <- function(
 
   set.seed(con$seed)
 
+  if (length(alpha) == 1) {
+    alpha <- as.numeric(alpha)
+  } else if (length(alpha) == n) {
+    stop(
+      "spGARCH implementation expects scalar 'alpha' for the simulation interface; pass a scalar or adapt C++ API."
+    )
+  } else {
+    stop("'alpha' must be a scalar or length n.")
+  }
+
   functions <- .choose_functions(type)
   f_inv <- functions$f_inv
   tau_eps <- functions$tau_eps
