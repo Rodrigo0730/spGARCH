@@ -1009,19 +1009,38 @@ plot.spARCH <- function(
   n <- length(y)
   rhoW_1 <- rho * W_1
   lambdaW_2 <- lambda * W_2
-  alpha <- alpha * rep(1, n)
 
-  result_g <- g(y, alpha, rhoW_1, lambdaW_2, theta, zeta, b, tau_y, f_inv)
-  eps <- as.vector(result_g[[1]])
-  h <- as.vector(result_g[[2]])
+  alpha_vec <- alpha * rep(1, n)
 
-  J <- 0.5 *
-    eps /
-    sqrt(h) *
-    d_h_d_eps(eps, h, alpha, theta, zeta, b, rhoW_1, lambdaW_2) +
-    diag(sqrt(h))
+  result_g <- g(y, alpha_vec, rhoW_1, lambdaW_2, theta, zeta, b, tau_y, f_inv)
+  eps <- as.vector(result_g[["eps"]])
+  h <- as.vector(result_g[["h"]])
 
-  return((-1) * (sum(log(dnorm(eps))) - log(det(J))))
+  if (
+    any(is.na(eps)) ||
+      any(is.infinite(eps)) ||
+      any(is.na(h)) ||
+      any(is.infinite(h))
+  ) {
+    return(1e10)
+  }
+
+  dh_deps <- tryCatch(
+    d_h_d_eps(eps, h, alpha, theta, zeta, b, rhoW_1, lambdaW_2),
+    error = function(e) NULL
+  )
+  if (is.null(dh_deps)) {
+    return(1e10)
+  }
+
+  J <- (0.5 * eps / sqrt(h)) * dh_deps + diag(sqrt(h))
+
+  det_J <- det(J)
+  if (is.na(det_J) || det_J <= 0) {
+    return(1e10)
+  }
+
+  return((-1) * (sum(log(dnorm(eps))) - log(det_J)))
 }
 
 #
