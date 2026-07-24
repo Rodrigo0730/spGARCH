@@ -1179,3 +1179,69 @@ nlse.spGARCH <- function(y, W1, W2, start = c(1, 0.5, 0.5), control = list()) {
 #   xi <- eps/sqrt(h)
 #   return( -1 * ( -n/2 * log(2 * pi) - 0.5*sum(log(h)) + log(det(diag(n) - lambda * B)) - 1/2*sum(xi^2) )    ) #
 # }
+
+##################################################
+#
+# GMM Estimation for Spatiotemporal ARCH
+#
+##################################################
+
+gmm.stARCH <- function(Y, W, p = 1, control = list()) {
+  n <- nrow(Y)
+  Total_Time <- ncol(Y)
+
+  T_obs <- Total_Time - 1
+
+  Y_star_full <- log(Y^2)
+
+  Y_star <- Y_star_full[, 2:Total_Time]
+  Y_star_lag <- Y_star_full[, 1:T_obs]
+
+  F_T <- matrix(0, nrow = T_obs, ncol = T_obs - 1)
+  for (t in 1:(T_obs - 1)) {
+    c_t <- sqrt((T_obs - t) / (T_obs - t + 1))
+    F_T[t, t] <- c_t
+    F_T[(t + 1):T_obs, t] <- -c_t / (T_obs - t)
+  }
+
+  Y_star_transformed <- Y_star %*% F_T
+  Y_star_lag_transformed <- Y_star_lag %*% F_T
+
+  J_n <- diag(n) - matrix(1 / n, nrow = n, ncol = n)
+
+  Y_double_star <- J_n %*% Y_star_transformed
+  Y_double_star_lag <- J_n %*% Y_star_lag_transformed
+
+  IV_base <- J_n %*% Y_star_full[, 1:(T_obs - 1)]
+  WY_IV <- W %*% IV_base
+  W2Y_IV <- W %*% WY_IV
+
+  Y_vec <- as.numeric(Y_double_star)
+  Y_lag_vec <- as.numeric(Y_double_star_lag)
+
+  Q_N <- cbind(as.numeric(IV_base), as.numeric(WY_IV), as.numeric(W2Y_IV))
+
+  tr_W <- sum(diag(W %*% J_n))
+  P_1 <- W - (tr_W / (n - 1)) * J_n
+
+  opt_res <- optim(
+    par = c(rho = 0.1, gamma = 0.1, delta = 0.1),
+    fn = .GMM_stARCH_CPP,
+    Y_vec = Y_vec,
+    Y_lag_vec = Y_lag_vec,
+    W = W,
+    P = as.matrix(P_1),
+    Q = Q_N,
+    method = "BFGS"
+  )
+
+  coefficients <- opt_res$par
+
+  return(list(
+    coefficients = coefficients,
+    Y_double_star = Y_double_star,
+    P_1 = P_1,
+    Q_N = Q_N,
+    opt_res = opt_res
+  ))
+}
