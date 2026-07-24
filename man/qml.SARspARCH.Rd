@@ -112,7 +112,7 @@ see also: \code{\link{solnp}}
 \seealso{
 \code{\link[Rsolnp]{solnp}} (package \code{\link[Rsolnp]{Rsolnp}})
 }
-\examples{
+\donttest{
 require("spdep")
 rho <- 0.5
 alpha <- 1
@@ -131,6 +131,7 @@ df <- data.frame(y = as.vector(solve(diag(n) - lambda * B) \%*\%
 out <- qml.SARspARCH(y ~ x2, B = B, W = W, data = df, type = "log-spARCH")
 
 summary(out)
+}
 }
 \keyword{Spatial Autoregressive Model with spARCH Residuals}
 \keyword{QML SARspARCH}% __ONLY ONE__ keyword per line
