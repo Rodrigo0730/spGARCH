@@ -5,13 +5,13 @@
 The function generates \code{n} random numbers of a spatial GARCH process for given parameters and weighting schemes.
 }
 \usage{
-sim.spGARCH(n = dim(W1)[1], rho, lambda, alpha, W1, W2,
+sim.spGARCH(n = nrow(W1), rho, lambda, alpha, W1, W2,
             b = 2, zeta = 0.5, theta = 0.5, type = "spGARCH",
             seed = NULL, control = list())
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
-  \item{n}{number of observations. If \code{length(n)} \eqn{> 1}{> 1}, the length is taken to be the number required. Default \code{dim(W1)[1]}}
+  \item{n}{number of observations. If \code{length(n)} \eqn{> 1}{> 1}, the length is taken to be the number required. Default \code{nrow(W1)}}
   \item{rho}{spatial dependence parameter rho}
   \item{lambda}{spatial dependence parameter lambda}
   \item{alpha}{unconditional variance level alpha}

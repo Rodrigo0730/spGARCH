@@ -5,12 +5,12 @@
 The function generates \code{n} random numbers of a spatial ARCH process for given parameters and weighting schemes.
 }
 \usage{
-sim.spARCH(n = dim(W)[1], rho, alpha, W, b = 2, type = "spARCH",
+sim.spARCH(n = nrow(W), rho, alpha, W, b = 2, type = "spARCH",
            seed = NULL, control = list())
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
-  \item{n}{number of observations. If \code{length(n)} \eqn{> 1}{> 1}, the length is taken to be the number required. Default \code{dim(W)[1]}}
+  \item{n}{number of observations. If \code{length(n)} \eqn{> 1}{> 1}, the length is taken to be the number required. Default \code{nrow(W)}}
   \item{rho}{spatial dependence parameter rho}
   \item{alpha}{unconditional variance level alpha}
   \item{W}{\code{n} times \code{n} spatial weight matrix}

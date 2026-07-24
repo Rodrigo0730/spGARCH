@@ -43,10 +43,10 @@ qml.spARCH <- function(
     stop("y must be a numeric vector \n")
   }
 
-  if (dim(W)[1] != dim(W)[2]) {
+  if (nrow(W) != ncol(W)) {
     stop("Spatial weight matrix must be quadratic \n")
   }
-  if (length(y) != dim(W)[1]) {
+  if (length(y) != nrow(W)) {
     stop(paste(
       "Spatial weight matrix must have dimension",
       length(y),
@@ -238,11 +238,11 @@ qml.spGARCH <- function(
     stop("y must be a numeric vector \n")
   }
 
-  if (dim(W1)[1] != dim(W1)[2] | dim(W2)[1] != dim(W2)[2]) {
+  if (nrow(W1) != ncol(W1) | nrow(W2) != ncol(W2)) {
     stop("Spatial weight matrices must be quadratic \n")
   }
 
-  if (length(y) != dim(W1)[1] | length(y) != dim(W2)[1]) {
+  if (length(y) != nrow(W1) | length(y) != nrow(W2)) {
     stop(paste(
       "Spatial weight matrices must have dimension",
       length(y),
@@ -415,10 +415,10 @@ qml.SARspARCH <- function(
     stop("'y' must be a numeric vector \n")
   }
 
-  if (dim(B)[1] != dim(B)[2] | dim(W)[1] != dim(W)[2]) {
+  if (nrow(B) != ncol(B) | nrow(W) != ncol(W)) {
     stop("Spatial weighting matrices must be quadratic \n")
   }
-  if (length(y) != dim(B)[1] | length(y) != dim(W)[1]) {
+  if (length(y) != nrow(B) | length(y) != nrow(W)) {
     stop(paste(
       "Spatial weight matrix must have dimension",
       length(y),
