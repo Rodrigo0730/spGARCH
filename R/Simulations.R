@@ -20,7 +20,7 @@ sim.spARCH <- function(
     runif(1)
   }
 
-  con <- list(seed = runif(1) * 10^9, silent = FALSE, triangular = FALSE)
+  con <- list(seed = sample(1:1e9, 1), silent = FALSE, triangular = FALSE)
   nmsC <- names(con)
   con[(namc <- names(control))] <- control
   if (length(noNms <- namc[!namc %in% nmsC])) {
@@ -141,7 +141,7 @@ sim.spGARCH <- function(
     runif(1)
   }
 
-  con <- list(seed = runif(1) * 10^9, silent = FALSE, triangular = FALSE)
+  con <- list(seed = sample(1:1e9, 1), silent = FALSE, triangular = FALSE)
   nmsC <- names(con)
   con[(namc <- names(control))] <- control
   if (length(noNms <- namc[!namc %in% nmsC])) {
