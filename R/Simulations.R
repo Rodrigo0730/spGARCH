@@ -214,8 +214,6 @@ sim.spGARCH <- function(
 
   # simulation
 
-  alpha <- alpha * rep(1, n)
-
   if (type %in% c("spGARCH", "complex-spGARCH")) {
     if (!con$triangular) {
       W1_norm <- norm(W1, "1")
@@ -232,12 +230,17 @@ sim.spGARCH <- function(
     eps <- rnorm(n)
   }
 
-  tau <- tau_eps(eps, W1, W2, alpha, theta, zeta, b)
-  S <- Matrix::solve(Matrix::Diagonal(n) - W2)
-  X <- S %*% (alpha + W1 %*% tau)
+  if (type %in% c("spGARCH", "complex-spGARCH")) {
+    E <- Matrix::Diagonal(x = eps^2)
+    M <- Matrix::Diagonal(n) - W1 %*% E - W2
+    X <- as.numeric(solve(M, rep(alpha, n)))
+  } else {
+    tau <- tau_eps(eps, W1, W2, alpha, theta, zeta, b)
+    X <- .Simulation_spGARCH_CPP(alpha, as.numeric(tau), W1, W2)
+  }
 
   if (type == "complex-spGARCH") {
-    Y <- sqrt(as.complex(f_inv(X))) * eps
+    Y <- sqrt(as.complex(as.vector(f_inv(X)))) * eps
   } else {
     Y <- sqrt(as.vector(f_inv(X))) * eps
   }
