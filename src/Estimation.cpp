@@ -522,3 +522,41 @@ double NLSE_spGARCH(Eigen::VectorXd pars, List param) {
     double SSE = errors.squaredNorm() / n;
     return SSE;
 }
+
+// [[Rcpp::export(".GMM_stARCH_CPP")]]
+double GMM_stARCH_CPP(Eigen::VectorXd par,
+                      Eigen::VectorXd Y_vec,
+                      Eigen::VectorXd Y_lag_vec,
+                      Eigen::MappedSparseMatrix<double> W,
+                      Eigen::MatrixXd P,
+                      Eigen::MatrixXd Q) {
+    double rho   = par[0];
+    double gamma = par[1];
+    double delta = par[2];
+
+    int n = W.rows();
+    int T_minus_1 = Y_vec.size() / n;
+
+    Eigen::Map<Eigen::MatrixXd> Y(Y_vec.data(), n, T_minus_1);
+    Eigen::Map<Eigen::MatrixXd> Y_lag(Y_lag_vec.data(), n, T_minus_1);
+
+    Eigen::MatrixXd U_mat = Y - rho * W * Y - gamma * Y_lag - delta * W * Y_lag;
+
+    Eigen::Map<Eigen::VectorXd> U_N(U_mat.data(), U_mat.size());
+
+    Eigen::VectorXd g_L = Q.transpose() * U_N;
+
+    double g_Q = 0;
+    for(int t = 0; t < T_minus_1; t++) {
+        Eigen::VectorXd U_t = U_mat.col(t);
+        g_Q += U_t.transpose() * P * U_t;
+    }
+
+    double obj = (g_Q * g_Q) + g_L.squaredNorm();
+
+    if(std::abs(rho) + std::abs(gamma) + std::abs(delta) >= 1.0) {
+        obj += 1e9;
+    }
+
+    return obj;
+}
