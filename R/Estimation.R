@@ -1222,7 +1222,7 @@ gmm.stARCH <- function(Y, W, p = 1, control = list()) {
 
   Q_N <- cbind(as.numeric(IV_base), as.numeric(WY_IV), as.numeric(W2Y_IV))
 
-  tr_W <- sum(diag(W %*% J_n))
+  tr_W <- sum(diag(as.matrix(W %*% J_n)))
   P_1 <- W - (tr_W / (n - 1)) * J_n
 
   opt_res <- optim(
