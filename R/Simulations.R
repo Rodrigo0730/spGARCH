@@ -216,9 +216,18 @@ sim.spGARCH <- function(
 
   alpha <- alpha * rep(1, n)
 
-  if (type == "spGARCH" && !con$triangular && length(W1@x) > 0) {
-    a <- 1 / sqrt(sqrt(norm(W1 %*% W1, "1")))
-    eps <- rtruncnorm(n, a = -a, b = a)
+  if (type %in% c("spGARCH", "complex-spGARCH")) {
+    if (!con$triangular) {
+      W1_norm <- norm(W1, "1")
+      if (W1_norm > 1e-12) {
+        a <- 1 / sqrt(sqrt(W1_norm))
+        eps <- truncnorm::rtruncnorm(n, a = -a, b = a)
+      } else {
+        eps <- rnorm(n)
+      }
+    } else {
+      eps <- rnorm(n)
+    }
   } else {
     eps <- rnorm(n)
   }
