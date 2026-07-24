@@ -483,3 +483,42 @@ double LL_SAREspARCHX(Eigen::VectorXd pars, List param) {
 
   return  (-1) * (sum_f_residuals + log_abs_det_partial + log_abs_det_partial_ar);
 }
+
+// [[Rcpp::export(".NLSE_spGARCH")]]
+double NLSE_spGARCH(Eigen::VectorXd pars, List param) {
+    double alpha = pars[0];
+    double rho   = pars[1];
+    double lambda= pars[2];
+
+    Eigen::VectorXd y = param["y"];
+    Eigen::MappedSparseMatrix<double> W1 = param["W1"];
+    Eigen::MappedSparseMatrix<double> W2 = param["W2"];
+
+    double c = -1.27036;
+    int n = y.size();
+
+    Eigen::VectorXd y2 = y.array().square();
+    Eigen::VectorXd rhs = alpha * Eigen::VectorXd::Ones(n) + rho * W1 * y2;
+
+    Eigen::SparseMatrix<double> M(n, n);
+    M.setIdentity();
+    M = M - lambda * W2;
+
+    Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
+    solver.compute(M);
+    if(solver.info() != Eigen::Success) {
+        return 1e9;
+    }
+
+    Eigen::VectorXd h = solver.solve(rhs);
+    if((h.array() <= 0).any()) {
+        return 1e9;
+    }
+
+    Eigen::VectorXd log_y2 = (y2.array() + 1e-12).log();
+    Eigen::VectorXd log_h  = h.array().log();
+    Eigen::VectorXd errors = log_y2.array() - c - log_h.array();
+
+    double SSE = errors.squaredNorm() / n;
+    return SSE;
+}
