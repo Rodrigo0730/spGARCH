@@ -80,6 +80,49 @@ Eigen::VectorXd Simulation_spGARCH_CPP(double alpha, Eigen::VectorXd tau, Eigen:
   return X;
 }
 
+// [[Rcpp::export(".d_h_d_eps_CPP")]]
+NumericMatrix d_h_d_eps_CPP(const Eigen::VectorXd &eps,
+                            const Eigen::VectorXd &h,
+                            double alpha_scalar,
+                            Eigen::MappedSparseMatrix<double> W1,
+                            Eigen::MappedSparseMatrix<double> W2) {
+  int n = eps.size();
+
+  VectorXd eps2 = eps.cwiseProduct(eps);
+  SparseMatrix<double> E(n,n);
+  E.reserve(Eigen::VectorXi::Constant(n,1));
+  for(int i=0;i<n;++i) E.insert(i,i) = eps2(i);
+
+  SparseMatrix<double> I(n,n); I.setIdentity();
+  SparseMatrix<double> M = I - W1 * E - W2;
+
+  SparseLU<SparseMatrix<double>> lu;
+  lu.compute(M);
+  if(lu.info() != Success) Rcpp::stop("Matrix M is singular in d_h_d_eps_CPP");
+
+  MatrixXd result = MatrixXd::Zero(n,n);
+  VectorXd alpha_vec = VectorXd::Constant(n, alpha_scalar);
+  VectorXd v = lu.solve(alpha_vec);
+
+  SparseMatrix<double> S = I - W2;
+  SparseLU<SparseMatrix<double>> luS;
+  luS.compute(S);
+  if(luS.info() != Success) Rcpp::stop("Matrix S is singular in d_h_d_eps_CPP");
+
+  for(int j=0;j<n;++j){
+    VectorXd e_j = VectorXd::Zero(n);
+    e_j(j) = 1.0;
+    VectorXd W1_col_j = W1 * e_j;
+    VectorXd temp = lu.solve(W1_col_j);
+    VectorXd W1_temp = W1 * temp;
+    VectorXd w = luS.solve(W1_temp);
+    double uj = v(j);
+    result.col(j) = 2.0 * eps(j) * uj * w;
+  }
+
+  return wrap(result);
+}
+
 // [[Rcpp::export(".asdgCMatrix")]]
 SEXP asdgCMatrix( SEXP IN ){
   // Søren Højsgaard
