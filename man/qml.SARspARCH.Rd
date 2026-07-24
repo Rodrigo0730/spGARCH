@@ -112,6 +112,7 @@ see also: \code{\link{solnp}}
 \seealso{
 \code{\link[Rsolnp]{solnp}} (package \code{\link[Rsolnp]{Rsolnp}})
 }
+\examples{
 \donttest{
 require("spdep")
 rho <- 0.5
