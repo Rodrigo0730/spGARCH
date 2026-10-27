@@ -45,7 +45,7 @@ sim.spARCH <- function(
   if (!is.numeric(n)) {
     stop("non-numeric argument n. \n")
   }
-  if (n < 1) {
+  if (n < 2) {
     stop("n must be greater than 1 \n")
   }
   if (nrow(W) != ncol(W)) {
@@ -93,7 +93,7 @@ sim.spARCH <- function(
     )
   }
   if (type == "log-spARCH") {
-    return(.Simulation_CPP_LOG(eps, W, alpha, b))
+    return(.Simulation_CPP_LOG(eps, W, alpha, 1)) # W is rho * W here
   } else if (type == "e-spARCH") {
     return(.Simulation_CPP_E(eps, W, alpha, b))
   }
@@ -176,7 +176,7 @@ sim.spGARCH <- function(
   ) {
     stop("invalid type: ", type)
   }
-  if (n < 1) {
+  if (n < 2) {
     stop("n must be greater than 1 \n")
   }
   if (nrow(W1) != ncol(W1) || nrow(W2) != ncol(W2)) {
