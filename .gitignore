@@ -1,0 +1,8 @@
+src/*.o
+src/*.so
+src/*.dll
+.Rhistory
+.RData
+.Rproj.user/
+.DS_Store
+tests/testthat/_snaps/

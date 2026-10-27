@@ -1,0 +1,867 @@
+================================================================================
+                  spGARCH PACKAGE — COMPLETE IMPLEMENTATION GUIDE
+                              For developers
+================================================================================
+
+This document covers every mathematical model, every R function, every C++
+function, their exact call chains, parameter mappings, known issues, and
+problematic patterns found in the codebase.
+
+Version: 2026-08-03
+
+================================================================================
+1. PACKAGE STRUCTURE
+================================================================================
+
+R/
+  Simulations.R    — sim.spARCH, sim.spGARCH, sim.stARCH, sim.stGARCH,
+                     sim.*_batch, .choose_functions (closure factory)
+  Estimation.R     — qml.spARCH, qml.spGARCH, qml.SARspARCH,
+                     nlse.spGARCH, gmm.stARCH,
+                     generic methods (print, summary, plot, etc.)
+  RcppExports.R    — auto-generated R-to-C++ bindings (.Call wrappers)
+  zzz.R            — .onAttach (bibliographic message only)
+
+src/
+  Simulations.cpp  — .Simulation_CPP, .Simulation_CPP_LOG, .Simulation_CPP_E,
+                     .Simulation_spGARCH_CPP, .d_h_d_eps_CPP, .asdgCMatrix
+  Estimation.cpp   — .LL_spARCH, .LL_spARCHX, .LL_EspARCH, .LL_EspARCHX,
+                     .LL_SARspARCH, .LL_SARspARCHX,
+                     .LL_SAREspARCH, .LL_SAREspARCHX,
+                     .NLSE_spGARCH, .GMM_stARCH_CPP
+  RcppExports.cpp  — auto-generated, wraps every [[Rcpp::export]] into
+                     .Call entry points + R_init_spGARCH
+
+data/              — (not analyzed)
+examples/simulation_estimation.R — end-to-end simulation→estimation workflow
+MAN/NAMESPACE/DESCRIPTION/MD5 — standard R package metadata
+
+================================================================================
+2. MATHEMATICAL MODELS
+================================================================================
+
+All models have an equation for the conditional volatility h (or ln(h))
+and observations Y = sqrt(h) * eps, where eps ~ N(0,1) i.i.d.
+
+----------------------------------------------------------------------
+2.1  spARCH  (pure spatial ARCH, one time period)
+----------------------------------------------------------------------
+
+  h = alpha + rho * W * diag(Y) * Y
+
+  Or element-wise:  h_i = alpha + rho * sum_j w_{ij} * Y_i * Y_j
+
+  This is a simultaneous equation system. In simulation, it is solved
+  as:  (I - rho*W * diag(eps^2)) * h = alpha * 1_n
+  because Y = sqrt(h) * eps ⇒ Y_i^2 = h_i * eps_i^2.
+
+  Jacobian for log-likelihood:
+    |J| = prod( h_i / xi_i^2 - eig(rho*W)^T )   — see C++ code
+
+  Parameters: alpha (scale), rho (spatial dependence)
+  Stationarity: depends on rho and W's spectral radius
+
+----------------------------------------------------------------------
+2.2  log-spARCH  (exponential/logarithmic spatial ARCH)
+----------------------------------------------------------------------
+
+  ln(h) = S * (alpha*1_n + b*rho*W * ln|Y|)
+  where S = (I + 0.5*b*rho*W)^{-1}
+
+  This avoids positivity constraints on h (h is always > 0).
+
+  Y = sqrt(exp(ln(h))) * eps
+
+  Parameters: alpha, rho, b
+  Note: 'b' is a fixed tuning parameter, not estimated by default.
+
+----------------------------------------------------------------------
+2.3  spGARCH  (spatial GARCH, unified framework)
+----------------------------------------------------------------------
+
+  h = f_inv(X)
+  where X solves: (I - lambda*W2) * X = alpha*1_n + rho*W1 * tau(Y)
+
+  For the standard "spGARCH" type:
+    f_inv(x) = x
+    tau(y)   = y^2
+
+  So: h = alpha + rho*W1 * Y^2 + lambda*W2 * h
+  (This is the spatial analogy of a GARCH(1,1): ARCH term via W1,
+   GARCH term via W2.)
+
+  Parameters: alpha, rho, lambda
+
+  Other types within the unified framework (choose_functions):
+    - "log-spGARCH":  f_inv(x)=exp(x), tau(y)=ln(y^2)
+    - "e-spGARCH":    f_inv(x)=exp(x), tau(y)=ln|y|, plus extra params theta, zeta
+    - "h-spGARCH":    f_inv(x)=exp(x), tau(y)=ln(y^2) (different variance dynamics)
+
+----------------------------------------------------------------------
+2.4  stARCH  (spatiotemporal ARCH, Otto et al. 2025)
+----------------------------------------------------------------------
+
+  Model in log-squared form:
+    ln(Y_t^2) = alpha + rho*W*ln(eps_t^2) + gamma*ln(Y_{t-1}^2)
+                + delta*W*ln(Y_{t-1}^2) + ln(eps_t^2)
+
+  Or equivalently, the volatility dynamics:
+    h*_t = alpha + rho*W*ln(eps_t^2) + gamma*ln(Y_{t-1}^2) + delta*W*ln(Y_{t-1}^2)
+    ln(Y_t^2) = h*_t + ln(eps_t^2)
+    Y_t = exp(h*_t/2) * eps_t
+
+  Parameters: alpha (level), rho (contemporaneous spatial),
+              gamma (temporal lag), delta (spatiotemporal lag)
+
+  Stationarity: |rho| + |gamma| + |delta| < 1
+
+  NOTE on alpha:
+    The simulation uses alpha, but the GMM estimator (gmm.stARCH) does NOT
+    estimate it. The GMM applies Helmert (time) + double-demeaning (spatial)
+    transformations that eliminate the additive constant. Only rho, gamma,
+    delta are recovered. This is expected behavior.
+
+----------------------------------------------------------------------
+2.5  stGARCH  (spatiotemporal GARCH)
+----------------------------------------------------------------------
+
+  h*_t = alpha + rho*W*ln(eps_t^2) + gamma*ln(Y_{t-1}^2)
+         + delta*W*ln(Y_{t-1}^2) + beta*h*_{t-1}
+
+  Same as stARCH but adds a GARCH term (beta*h*_{t-1}) for volatility
+  persistence.
+
+  Parameters: alpha, rho, gamma, delta, beta
+  No GMM estimator for stGARCH exists in this codebase.
+
+----------------------------------------------------------------------
+2.6  SAR-spARCH  (spatial autoregressive mean + spatial ARCH variance)
+----------------------------------------------------------------------
+
+  Mean (SAR):     xi = y - lambda * B * y
+  Variance (ARCH): h = alpha + rho * W * diag(xi) * xi
+  Observation:    y = lambda*B*y + sqrt(h)*eps
+
+  Note: B is the spatial weight matrix for the mean,
+        W is the spatial weight matrix for the variance.
+        They can be different.
+
+  Parameters: alpha, rho, lambda
+  Log-likelihood includes Jacobian from both SAR and spARCH parts.
+
+================================================================================
+3. SIMULATION FUNCTIONS — FULL CALL CHAINS
+================================================================================
+
+----------------------------------------------------------------------
+3.1  sim.spARCH( n, rho, alpha, W, b, type, seed, control )
+     → R/Simulations.R:9
+----------------------------------------------------------------------
+  Input:  W (n×n), rho (scalar), alpha (scalar)
+  Output: Y (n×1 vector for one time period)
+
+  Step 1: Form Wscaled = rho * W
+  Step 2: Generate eps ~ N(0,1), possibly truncated
+  Step 3: Call appropriate C++ function:
+    type = "spARCH"        → .Simulation_CPP(eps, Wscaled, alpha)
+                             returns h, then Y = sqrt(h) * eps
+    type = "log-spARCH"    → .Simulation_CPP_LOG(eps, Wscaled, alpha, b)
+                             returns Y directly (n×1)
+    type = "e-spARCH"      → .Simulation_CPP_E(eps, Wscaled, alpha, b)
+                             returns Y directly (n×1)
+    type = "complex-spARCH" → .Simulation_CPP(eps, Wscaled, alpha)
+                             returns h, then Y = sqrt(as.complex(h)) * eps
+
+  C++ details:
+  .Simulation_CPP (Simulations.cpp:5)
+    — Solves (I - W*diag(eps^2)) * h = alpha*1_n via SparseLU
+    — Returns h
+
+  .Simulation_CPP_LOG (Simulations.cpp:27)
+    — Solves (I - alpha_1*W) * ln(h) = alpha_0*1_n + alpha_1*W*ln(eps^2)
+    — alpha_0 = alpha (the constant), alpha_1 = rho (the spatial param)
+      *** IMPORTANT: The C++ function uses names alpha_0, alpha_1 but
+          the R caller sets alpha_0=alpha, alpha_1=the-scaled-rho ***
+      *** Wait — looking at the code more carefully:
+          sim.spARCH sets W <- rho * W (line 60)
+          Then calls .Simulation_CPP_LOG(eps, W, alpha, b)
+          So W already includes rho in it.
+          In the C++ function:
+            M = I - alpha_1 * W  where alpha_1 = b in C++
+          No — let me re-check.
+      ***
+      ACTUAL MAPPING: sim.spARCH line 96/98 calls:
+        .Simulation_CPP_LOG(eps, W, alpha, b)
+      Where W was already scaled by rho on line 60: W <- rho * W
+      In C++ (line 27-47):
+        M = I - alpha_1 * W   (C++ param alpha_1 = R param b)
+        rhs = alpha_0 * 1_n + alpha_1 * W * log_eps2
+             (C++ param alpha_0 = R param alpha)
+        So the model equation is:
+        (I - b*rho*W) * ln(h) = alpha + b*rho*W * ln(eps^2)
+        This matches the paper's log-spARCH formulation with b as the
+        tuning parameter and rho pre-multiplied into W.
+      ***
+
+  .Simulation_CPP_E (Simulations.cpp:49)
+    — ln(h) = alpha*1_n + W * b*ln|eps|
+    — W is pre-scaled by rho in R, so W = rho*W_original
+    — Returns Y = sqrt(exp(ln(h))) * eps
+
+----------------------------------------------------------------------
+3.2  sim.spGARCH( n, rho, lambda, alpha, W1, W2, b, zeta, theta,
+                  type, seed, control )
+     → R/Simulations.R:134
+----------------------------------------------------------------------
+  Input:  W1, W2 (both n×n), rho, lambda, alpha (all scalars)
+  Output: Y (n×1 vector for one time period)
+
+  Step 1: Scale W1 = rho * W1, W2 = lambda * W2
+  Step 2: Generate eps ~ N(0,1), possibly truncated
+  Step 3: For type="spGARCH" or "complex-spGARCH":
+            Direct solve (not using .choose_functions):
+            E = diag(eps^2)
+            M = I - W1*E - W2
+            X = solve(M, alpha*1_n)
+            Y = sqrt(f_inv(X)) * eps
+  Step 4: For other types (log-spGARCH, e-spGARCH, h-spGARCH):
+            Call .choose_functions(type) to get f_inv, tau_eps
+            tau = tau_eps(eps, ...)
+            X = .Simulation_spGARCH_CPP(alpha, tau, W1, W2)
+            Y = sqrt(f_inv(X)) * eps
+
+  .Simulation_spGARCH_CPP (Simulations.cpp:60)
+    — Solves (I - W2) * X = alpha*1_n + W1 * tau  via SparseLU
+    — Returns X (the latent process, before f_inv)
+
+  NOTE: For "spGARCH" type, the simulation does NOT go through
+  .Simulation_spGARCH_CPP — it solves directly in R (lines 231-234).
+  .Simulation_spGARCH_CPP is only used for log-spGARCH, e-spGARCH,
+  and h-spGARCH types.
+
+----------------------------------------------------------------------
+3.3  sim.stARCH( n, TT, rho, gamma, delta, alpha, W, control )
+     → R/Simulations.R:453
+----------------------------------------------------------------------
+  Input:  W (n×n), TT (time periods), rho, gamma, delta, alpha
+  Output: Y (n × TT matrix)
+
+  Pure R implementation — no C++ calls.
+
+  Algorithm:
+  burnin = control$burnin (default 50)
+  Total_T = TT + burnin
+  I_n = Diagonal(n)
+  A = I_n - rho * W
+
+  For t = 1:
+    h_star[,1] = alpha
+    Y[,1] = exp(h_star[,1]/2) * eps[,1]
+    log_Y2[,1] = log_eps2[,1] + h_star[,1]
+
+  For t = 2..Total_T:
+    rhs = alpha + rho*(W %*% log_eps2[,t])
+                + gamma * log_Y2[,t-1]
+                + delta * (W %*% log_Y2[,t-1])
+    h_star[,t] = as.numeric(solve(A, rhs))
+    Y[,t] = exp(h_star[,t]/2) * eps[,t]
+    log_Y2[,t] = h_star[,t] + log_eps2[,t]
+
+  Return Y[, (burnin+1):Total_T]
+
+  NOTE: burnin is hardcoded to 50 in the default control list,
+  NOT passed from the caller's control.
+  Watch for: control$seed = NULL means set.seed is never called,
+  so reproducibility requires explicit seed management.
+
+----------------------------------------------------------------------
+3.4  sim.stGARCH( n, TT, rho, gamma, delta, beta, alpha, W, control )
+     → R/Simulations.R:505
+----------------------------------------------------------------------
+  Same as sim.stARCH but adds + beta*h_star[,t-1] to the rhs equation.
+
+  No estimation function exists for stGARCH in this codebase.
+
+----------------------------------------------------------------------
+3.5  .choose_functions(model)  — R/Simulations.R:280
+----------------------------------------------------------------------
+  This is a CLOSURE FACTORY. It returns a list of 5 functions
+  tailored to the specific spGARCH variant:
+
+  Returns:
+    f_inv        — inverse link: R → R+
+    tau_eps      — transformation of innovations
+    tau_y        — transformation of observations
+    g            — function mapping (y, params) → (eps, h) for LL
+    d_h_d_eps    — Jacobian dh/deps for determinant computation
+
+  The closures differ by model type but share the parameter interface:
+  g(y, alpha, rhoW_1, lambdaW_2, theta, zeta, b, tau_y, f_inv)
+  d_h_d_eps(eps, h, alpha, theta, zeta, b, rhoW_1, lambdaW_2)
+
+  Model types and their closures:
+  ┌──────────────┬───────────┬────────────────┬──────────────────┐
+  │ Model        │ f_inv(x)  │ tau_y(y)       │ Additional params │
+  ├──────────────┼───────────┼────────────────┼──────────────────┤
+  │ spGARCH      │ x         │ y^2            │ theta=1, zeta=1   │
+  │ log-spGARCH  │ exp(x)    │ NULL (unused)  │ b (tuning)        │
+  │ e-spGARCH    │ exp(x)    │ ln|y|          │ theta, zeta, b    │
+  │ h-spGARCH    │ exp(x)    │ ln(y^2)        │ theta=1, zeta=1   │
+  └──────────────┴───────────┴────────────────┴──────────────────┘
+
+================================================================================
+4. ESTIMATION FUNCTIONS — FULL CALL CHAINS
+================================================================================
+
+----------------------------------------------------------------------
+4.1  qml.spARCH( formula, W, type, data, b, start, control )
+     → R/Estimation.R:9
+----------------------------------------------------------------------
+  Quasi-Maximum Likelihood for pure spatial ARCH.
+
+  Step 1: Parse formula, extract y (response), X (design matrix)
+  Step 2: Choose log-likelihood function based on type and whether
+          regressors are present:
+    type="spARCH",  no X  → .LL_spARCH(pars, param)
+    type="spARCH",  + X   → .LL_spARCHX(pars, param)
+    type="log-spARCH", no X → .LL_EspARCH(pars, param)
+    type="log-spARCH",+X   → .LL_EspARCHX(pars, param)
+  Step 3: Call Rsolnp::solnp() for constrained optimization
+          with bounds LB, UB
+    spARCH:     LB=(1e-6, 0),    UB=(Inf, Inf)
+    log-spARCH: LB=(1e-6, 0),    UB=(Inf, Inf)
+  Step 4: Compute standard errors from Hessian via solve(hessian)
+  Step 5: Build and return spARCH S4 object
+
+  Parameter mapping (no regressors):
+    pars[1] = alpha, pars[2] = rho
+    Return: fit$coefficients = c(alpha_hat, rho_hat)
+
+  Parameter mapping (with regressors):
+    pars[1] = alpha, pars[2] = rho, pars[3:...] = beta
+    Return: fit$coefficients = c(alpha_hat, rho_hat, beta_hat)
+
+  C++ log-likelihood functions:
+    - Negative log-likelihood (for minimization)
+    - Compute h from parameters
+    - Compute eps = y/sqrt(h)
+    - Compute Jacobian log-determinant from eigenvalues
+    - Return -1 * (Gaussian LL + log|J|)
+
+  Jacobian structure (spARCH, no X):
+    M_stable = I - rho * diag(eps) * W^T * diag(eps)
+    log|J| = -0.5 * sum(log(h)) + sum(log|eig(M_stable)|)
+
+  Jacobian structure (spARCH, with X):
+    xi = y - X*beta
+    M_stable = diag(h/xi^2) - (rho*W)^T
+    log|J| = sum( log(xi^2 / h^(3/2)) ) + sum(log|eig(M_stable)|)
+
+  Jacobian structure (log-spARCH / E-spARCH, with X):
+    S = (I + 0.5*b*rho*W)^{-1}
+    M_stable = diag(2h/b) - (rho*W .* S)^T
+    log|J| = sum( log(b / (2*h^(3/2))) ) + sum(log|eig(M_stable)|)
+
+  *** KNOWN ISSUE ***
+  The returned object from qml.spARCH has:
+    coefficients = snp$pars
+  The parameter names in summary.spARCH (line 653-657) are hardcoded:
+    If AR=FALSE: "alpha", "rho"
+    If AR=TRUE:  "alpha (spARCH)", "rho (spARCH)", "lambda (SAR)"
+  This means the parameters are ALWAYS labeled alpha, rho regardless
+  of type. For log-spARCH, the second parameter (called 'rho' in code)
+  is actually different from the spARCH rho. The naming is misleading
+  for log-spARCH and E-spARCH types.
+
+----------------------------------------------------------------------
+4.2  qml.spGARCH( formula, W1, W2, type, data, b, start, control )
+     → R/Estimation.R:200
+----------------------------------------------------------------------
+  Quasi-Maximum Likelihood for spatial GARCH.
+
+  Uses the unified approach — the log-likelihood is computed in PURE R
+  via .LL_unified(), which dispatches to C++ only for the Jacobian.
+
+  Step 1: Parse formula, extract y, X
+  Step 2: Call .choose_functions(type) to get g, d_h_d_eps, f_inv, tau_y
+  Step 3: Set bounds based on type:
+    spGARCH:     LB=(1e-6, 0, 0),       UB=(Inf, Inf, Inf)
+                 params: alpha, rho, lambda
+    log-spGARCH: LB=(1e-6, 0, 0, 0),    UB=(Inf, Inf, Inf, Inf)
+                 params: alpha, rho, lambda, b
+    e-spGARCH:   LB=(1e-6, 0, 0, 0, -Inf), UB=(Inf, Inf, Inf, Inf, Inf)
+                 params: alpha, rho, lambda, theta, zeta
+  Step 4: Call Rsolnp::solnp() with .LL_unified
+
+  .LL_unified(pars, param) — R/Estimation.R:973
+    This is a PURE R function (no C++), though it calls C++ for
+    the Jacobian:
+      1. Extract params (alpha, rho, lambda, [b, theta, zeta])
+      2. Call g(y, alpha, rhoW1, lambdaW2, ...) → (eps, h)
+      3. Call d_h_d_eps(eps, h, ...) → Jacobian matrix dh/deps
+         For spGARCH type, this calls .d_h_d_eps_CPP
+         For other types, this is pure R (in .choose_functions closures)
+      4. Compute J = 0.5 * eps/sqrt(h) * dh/deps + diag(sqrt(h))
+      5. If det(J) invalid → return 1e10 (penalty)
+      6. Return -1 * (sum(log(dnorm(eps))) - log(det(J)))
+
+  Step 5: Build and return spGARCH object
+
+  Parameter mapping:
+    pars[1] = alpha, pars[2] = rho, pars[3] = lambda
+    Return: fit$coefficients = c(alpha_hat, rho_hat, lambda_hat)
+
+  *** NOTE ***
+  The returned coefficients do NOT have names. They are raw numeric
+  values from snp$pars. The example script accesses them by index:
+    fit$coefficients[1] = alpha
+    fit$coefficients[2] = rho
+    fit$coefficients[3] = lambda
+
+  *** KNOWN ISSUE ***
+  qml.spGARCH does NOT have a summary method. The summary.spARCH method
+  is defined for class "spARCH" only. spGARCH models use the same
+  generic functions but may have different parameter dimensionality.
+
+  *** KNOWN ISSUE ***
+  The spGARCH estimation with regressors (dim(X)[2] > 0) throws:
+    "spGARCH models with regressors are not yet implemented" (line 310)
+
+----------------------------------------------------------------------
+4.3  qml.SARspARCH( formula, B, W, type, data, b, start, eigen_v,
+                    control )
+     → R/Estimation.R:377
+----------------------------------------------------------------------
+  QML for SAR-spARCH (spatial lag in mean + spatial ARCH in variance).
+
+  Step 1: Parse formula, extract y and X
+  Step 2: Precompute eigenvalues of B (needed for SAR Jacobian)
+  Step 3: Determine lambda bounds from B's eigenvalues:
+    lambda ∈ (1/min(eig(B)) + eps, 1/max(eig(B)) - eps)
+  Step 4: Choose C++ log-likelihood based on type:
+    type="spARCH",    no X → .LL_SARspARCH
+    type="spARCH",    +X   → .LL_SARspARCHX
+    type="log-spARCH",no X → .LL_SAREspARCH
+    type="log-spARCH",+X   → .LL_SAREspARCHX
+  Step 5: Call Rsolnp::solnp()
+  Step 6: Return spARCH object with AR=TRUE
+
+  C++ LL structure (SAR-spARCH):
+    xi = y - lambda*B*y - X*beta    [mean equation with SAR]
+    h = alpha + rho*W*diag(xi)*xi   [spARCH variance]
+    log|J_spARCH| = sum(log(xi^2/h^(3/2))) + sum(log|eig(diag(h/xi^2)-(rhoW)^T)|)
+    log|J_SAR|    = sum(log|1 - lambda*eig(B)|)
+    LL = -n/2*log(2pi) - 0.5*sum(eps^2) + log|J_spARCH| + log|J_SAR|
+
+----------------------------------------------------------------------
+4.4  nlse.spGARCH( y, W1, W2, start, control )
+     → R/Estimation.R:1050
+----------------------------------------------------------------------
+  Non-Linear Least Squares estimation for spGARCH.
+
+  Alternative to QML. Works in log-space with a constant adjustment.
+
+  Step 1: Call Rsolnp::solnp() with .NLSE_spGARCH as objective
+  Step 2: Post-estimation: solve (I - lambda_hat*W2)*h = alpha_hat + rho_hat*W1*y^2
+
+  .NLSE_spGARCH (Estimation.cpp:486)
+    — Solves (I - lambda*W2) * h = alpha*1_n + rho*W1 * y^2
+    — Uses c ≈ -1.27036 = mean(log(chi^2_1)) = Euler's constant adjustment
+    — SSE = mean( (log(y^2 + 1e-12) - c - log(h))^2 )
+    — Penalty 1e9 if solve fails or any h <= 0
+    — Penalty 1e9 if |rho| + |lambda| >= 1 (though this restriction
+      is enforced in the R level, not in C++)
+
+  Parameters: alpha, rho, lambda
+  Return: nlse object with coefficients, residuals, h, SSE
+
+  *** KEY DIFFERENCE from QML ***
+  The NLSE works in log-space: log(y^2) = c + log(h) + error
+  This avoids the Jacobian determinant computation entirely.
+  The constant c = -1.27036 accounts for E[log(chi^2_1)].
+  This is more numerically stable but may be less efficient than QML.
+
+----------------------------------------------------------------------
+4.5  gmm.stARCH( Y, W, p, control )
+     → R/Estimation.R:1187
+----------------------------------------------------------------------
+  GMM estimation for spatiotemporal ARCH.
+
+  Input:  Y (n × TT matrix), W (n×n), p (lag order, default 1)
+  Output: $coefficients = c(rho, gamma, delta)
+
+  Step 1: Y_star = log(Y^2)   [log-squared transformation]
+  Step 2: Split into current (Y_star[,2:TT]) and lagged (Y_star[,1:(TT-1)])
+  Step 3: Apply Helmert transformation to both (removes time FE):
+    helmert(M): For each column t (reverse order):
+      R[,t] = ct * (M[,t] - S[,t+1]/(T-t))
+      where ct = sqrt((T-t)/(T-t+1)), S is cumulative sum
+  Step 4: Double-demean with J_n = I - (1/n)*1*1^T:
+    Y_double_star = J_n * Y_transformed
+    (This removes spatial/location fixed effects)
+  Step 5: Build instruments:
+    IV_base = J_n * Y_star_full[,1:(T-2)]
+    WY_IV = W * IV_base
+    W2Y_IV = W * WY_IV
+    Q_N = cbind(vec(IV_base), vec(WY_IV), vec(W2Y_IV))
+  Step 6: Build matrix P = W - (tr(W*J_n)/(n-1)) * J_n
+    (for the quadratic moment condition)
+  Step 7: Run stats::optim(par=c(0.1,0.1,0.1), fn=.GMM_stARCH_CPP,
+            method="BFGS")
+
+  .GMM_stARCH_CPP (Estimation.cpp:525)
+    — Reshapes Y_vec → (n × T-1) matrix
+    — U_mat = Y - rho*W*Y - gamma*Y_lag - delta*W*Y_lag
+    — g_L = Q^T * vec(U)     [linear moment conditions]
+    — g_Q = sum_t U_t^T * P * U_t   [quadratic moment condition]
+    — obj = g_Q^2 + ||g_L||^2
+    — Penalty 1e9 if |rho| + |gamma| + |delta| >= 1
+
+  Parameters: par[1]=rho, par[2]=gamma, par[3]=delta
+  alpha is NOT estimated (eliminated by the double-demeaning).
+
+  *** WARNING: default start values ***
+  The optim call uses hardcoded starting values c(rho=0.1, gamma=0.1,
+  delta=0.1). These cannot be overridden by the user.
+
+  *** WARNING: 'p' parameter unused ***
+  The p parameter (lag order) is accepted but NOT used in the function
+  body. The implementation hardcodes p=1 behavior.
+
+================================================================================
+5. COMPLETE R → C++ CALL GRAPH
+================================================================================
+
+  sim.spARCH()
+    ├── type="spARCH":             .Simulation_CPP
+    ├── type="log-spARCH":         .Simulation_CPP_LOG
+    ├── type="e-spARCH":           .Simulation_CPP_E
+    └── type="complex-spARCH":     .Simulation_CPP
+
+  sim.spGARCH()
+    ├── type="spGARCH":            [pure R solve]
+    ├── type="complex-spGARCH":    [pure R solve]
+    ├── type="log-spGARCH":        .Simulation_spGARCH_CPP
+    ├── type="e-spGARCH":          .Simulation_spGARCH_CPP
+    └── type="h-spGARCH":          .Simulation_spGARCH_CPP
+
+  qml.spARCH()
+    ├── type="spARCH" + no X:      .LL_spARCH
+    ├── type="spARCH" + X:         .LL_spARCHX
+    ├── type="log-spARCH" + no X:  .LL_EspARCH
+    └── type="log-spARCH" + X:     .LL_EspARCHX
+
+  qml.spGARCH() (unified)
+    ├── .LL_unified() [pure R]
+    │   └── .d_h_d_eps_CPP (for "spGARCH" type only)
+    │       Other types compute dh/deps in pure R closures
+    └── called via Rsolnp::solnp()
+
+  qml.SARspARCH()
+    ├── type="spARCH" + no X:      .LL_SARspARCH
+    ├── type="spARCH" + X:         .LL_SARspARCHX
+    ├── type="log-spARCH" + no X:  .LL_SAREspARCH
+    └── type="log-spARCH" + X:     .LL_SAREspARCHX
+
+  nlse.spGARCH()                   .NLSE_spGARCH
+  gmm.stARCH()                     .GMM_stARCH_CPP
+
+  Utility:
+  qml.spARCH(), qml.spGARCH(), etc. → .asdgCMatrix (W matrix coercion)
+
+================================================================================
+6. C++ IMPLEMENTATION DETAILS
+================================================================================
+
+6.1  Linear Algebra Approach
+  - Uses Eigen library via RcppEigen
+  - Sparse matrices: MappedSparseMatrix<double> (no-copy mapping from R's dgCMatrix)
+  - Sparse LU solver: SparseLU<SparseMatrix<double>>
+  - Dense eigenvalue computations: SelfAdjointEigenSolver or EigenSolver
+
+6.2  Memory Allocation Considerations
+  - .d_h_d_eps_CPP builds a dense n×n matrix (can be large for big n)
+  - Each LL function allocates dense n×n matrices for eigenvalue computation
+  - The SAR Jacobian uses precomputed eigenvalues of B to avoid repeated
+    eigendecompositions inside the optimization loop
+
+6.3  Penalty Mechanism
+  - When the Jacobian determinant is invalid (<=0), Singular/non-finite,
+    the C++ functions don't return Inf — the check happens in R (.LL_unified)
+  - .NLSE_spGARCH returns 1e9 for numerical failures
+  - .GMM_stARCH_CPP adds 1e9 for stability boundary violations
+  - This is a soft constraint approach: large penalty discourages the
+    optimizer from entering invalid regions without crashing
+
+6.4  Eigenvalue Computation
+  - Symmetric case: SelfAdjointEigenSolver (faster, guarantees real eigenvalues)
+  - Non-symmetric case: EigenSolver (slower, uses `.real()` to discard
+    imaginary parts)
+  - The symmetry flag is passed from R (isSymmetric(W)) — IMPORTANT for
+    correctness: if W is asymmetric and sym=TRUE, eigenvalues may be wrong
+
+================================================================================
+7. PARAMETER NAMING CONVENTIONS — POTENTIAL CONFUSIONS
+================================================================================
+
+7.1  alpha  — has different meanings across models:
+  - spARCH:       alpha = baseline volatility (constant term)
+  - log-spARCH:   alpha = baseline log-volatility
+  - spGARCH:      alpha = baseline variance (h = alpha + ...)
+  - stARCH:       alpha = baseline log-volatility
+  These are ALL the same concept (baseline level), but in different
+  scales (variance vs log-variance).
+
+7.2  rho  — spatial dependence parameter:
+  - In spARCH: rho multiplies the contemporaneous spatial term
+  - In stARCH: rho multiplies W*ln(eps^2) (contemporaneous spatial)
+  - In spGARCH: rho multiplies W1 (spatial ARCH term)
+  - In log-spARCH: rho is pre-multiplied into W before passing to C++
+    The C++ function receives Wscaled = rho * W, so rho doesn't
+    appear as a separate parameter in the C++ code.
+
+7.3  lambda  — has different meanings:
+  - In spGARCH: lambda is the GARCH parameter (multiplies W2*h)
+  - In SAR-spARCH: lambda is the SAR parameter (spatial lag of y)
+  These are completely different concepts that share a variable name.
+
+7.4  Parameter ordering in coefficient vectors:
+  - spARCH (no X):   c(alpha, rho)
+  - spARCH (+X):     c(alpha, rho, beta1, beta2, ...)
+  - spGARCH:         c(alpha, rho, lambda)
+  - SAR-spARCH:      c(alpha, rho, lambda)
+  - stARCH (GMM):    c(rho, gamma, delta) — NO alpha
+  - stARCH simul:    params rho, gamma, delta, alpha — includes alpha
+
+7.5  C++ naming vs R naming:
+  .Simulation_CPP_LOG: alpha_0 = baseline, alpha_1 = b (from R)
+  .LL_EspARCH:         alpha = baseline, rho = spatial (called rhoW after scaling)
+  .LL_spARCH:          alpha = baseline, rho = spatial
+
+================================================================================
+8. KNOWN ISSUES AND BUGS
+================================================================================
+
+8.1  stARCH GMM does not estimate alpha
+  - Cause: Helmert + double-demeaning transformations eliminate the constant
+  - Impact: Cannot recover the baseline log-volatility level
+  - Fix: Not a bug; this is by design for GMM estimation of the model.
+    For forecasting, recover alpha from the residual variance.
+  - Documentation issue: the example script does not mention this, and the mismatch
+    between simulation params (4 params) and estimated params (3 params)
+    can be confusing.
+
+8.2  .GMM_stARCH_CPP hardcodes default starting values
+  - Location: Estimation.R line 1234: par = c(rho=0.1, gamma=0.1, delta=0.1)
+  - Problem: User cannot supply custom starting values
+  - The 'control' parameter of gmm.stARCH is accepted but not used
+    for setting start values.
+
+8.3  stARCH burnin not configurable
+  - Location: Simulations.R line 463: con$burnin = 50
+  - The control parameter can override it (con[names(control)] <- control),
+    but burnin=50 is the hard default. For short TT, this wastes data.
+
+8.4  sim.stARCH and sim.stGARCH burnin logic
+  - The burnin value (default 50) is passed from R but the Simulation.R
+    function overwrites it from control list. In the example script, burnin=100 is
+    passed explicitly, which overrides the default. This works correctly.
+
+8.5  gmm.stARCH 'p' parameter is ignored
+  - The function signature accepts p=1 but never uses it
+  - Implementation hardcodes first-order lag (Y_star_lag uses only lag 1)
+  - The instruments IV_base use Y_star_full[,1:(T_obs-1)], also lag 1
+
+8.6  spGARCH with regressors not implemented
+  - Location: Estimation.R line 310
+  - qml.spGARCH throws an error if the formula includes covariates
+  - This is a significant limitation for applied work
+
+8.7  No summary method for spGARCH objects
+  - qml.spGARCH returns class "spGARCH" but summary.spARCH is defined
+    only for class "spARCH"
+  - The print.spARCH method works for spGARCH objects but the summary
+    method does NOT have appropriate parameter labels
+
+8.8  qml.spGARCH parameter order assumption
+  - The example script accesses coefficients by position (fit$coefficients[1], etc.)
+  - If the optimization were to change parameter ordering, this would break
+  - No named access pattern exists for spGARCH results
+
+8.9  Lower-triangular W assumption in the example script
+  - The example script builds a lower-triangular W explicitly
+  - Passes triangular=TRUE to sim.spARCH and sim.spGARCH
+  - This disables the truncation of eps (needed for non-triangular W
+    to ensure stationarity)
+  - With lower-triangular W, the inverse (I - W)^(-1) exists and
+    the process is well-defined without truncation
+  - If W were general, the triangular flag must be FALSE
+
+8.10 Naming inconsistency: .LL_EspARCH vs "log-spARCH"
+  - The function is called .LL_EspARCH but the model type is "log-spARCH"
+  - Similarly .LL_EspARCHX, .LL_SAREspARCH, .LL_SAREspARCHX
+  - E-spARCH = exponential spARCH = log-spARCH (same model, different names)
+  - The C++ function names use "EspARCH" but R type strings use "log-spARCH"
+
+8.11 sim.spARCH W-scaling before C++ calls
+  - In sim.spARCH (line 60): W <- rho * W
+  - This means W is ALREADY SCALED when passed to C++
+  - The C++ .Simulation_CPP receives Wscaled, not raw W
+  - This is fine for simulation but important to keep in mind:
+    the C++ functions for simulation always receive pre-scaled W
+
+8.12 Stationarity check inconsistency
+  - spARCH models: enforced via truncated eps when not triangular
+  - spGARCH: enforced via truncated eps when not triangular
+  - stARCH: enforced via |rho|+|gamma|+|delta| >= 1 penalty
+  - No consistent stationarity/persistence condition across model types
+
+================================================================================
+9. NUMERICAL CONSIDERATIONS
+================================================================================
+
+9.1  Matrix Inversion vs Solving
+  - C++ code always uses solve() (SparseLU), not explicit inversion
+  - Exception: log-spARCH LL functions use .inverse() on (I + 0.5*b*rhoW)
+    because this matrix is reused in the Jacobian computation
+  - The spGARCH simulation for "spGARCH" type also uses solve() on the
+    full system M = I - W1*E - W2, which can be singular if eps is extreme
+
+9.2  Eigenvalue Approach for Log-Determinant
+  - All LL functions compute log|J| = sum(log|eig(M)|) rather than det(M)
+  - This is more numerically stable than computing the determinant directly
+  - However, it requires O(n^3) dense eigendecomposition per LL evaluation
+  - For large n (>1000), this becomes the computational bottleneck
+
+9.3  Truncation of Innovations
+  - For non-triangular W, eps ~ truncated normal with bounds [-a, a]
+    where a = 1/sqrt(W_norm) for spARCH, a = 1/sqrt(sqrt(W_norm)) for spGARCH
+  - This ensures the matrix (I - W*diag(eps^2)) is always invertible
+  - The truncation is a sufficient but not necessary condition for stationarity
+
+9.4  Starting Values
+  - qml.spARCH: default = c(0.4, 1) for (alpha, rho)
+  - qml.spGARCH: default = c(1, 0.5, 0.3) for (alpha, rho, lambda)
+  - gmm.stARCH: hardcoded = c(0.1, 0.1, 0.1) for (rho, gamma, delta)
+  - These defaults work for the paper's examples but may be poor for
+    other data/W matrices
+
+9.5  Optimizer
+  - All QML methods use Rsolnp::solnp (augmented Lagrange method)
+  - gmm.stARCH uses stats::optim(method="BFGS")
+  - No gradient functions are provided — solnp uses numerical derivatives
+
+================================================================================
+10. EXAMPLE SCRIPT STRUCTURE (FOR TESTING AND DEVELOPMENT)
+================================================================================
+
+The file examples/simulation_estimation.R (170 lines) has 3 sections:
+
+1. SETUP (lines 1-26)
+   - Loads libraries (Matrix, devtools)
+   - Creates lower-triangular W (40×40, max 3 neighbors per row)
+   - Validates W properties
+
+2. spARCH (lines 28-71)
+   - sim.spARCH n=40, rho=0.3, alpha=1, W, type="spARCH", triangular=TRUE
+   - qml.spARCH(Y ~ 0, W)
+   - Prints true vs estimated alpha, rho
+   - Cleans up with rm()
+
+3. stARCH (lines 74-170)
+   - sim.stARCH n=40, TT=1000, rho=0.3, gamma=0.2, delta=0.1, alpha=1, burnin=100
+   - gmm.stARCH(Y, W)
+   - Prints true vs estimated rho, gamma, delta (NO alpha)
+   - Cleans up with rm()
+
+   - sim.spGARCH n=40, rho=0.2, lambda=0.1, alpha=1, W1=W, W2=W, triangular=TRUE
+   - qml.spGARCH(Y ~ 0, W, W, type="spGARCH")
+   - Prints true vs estimated alpha, rho, lambda
+   - Done message
+
+To run: Rscript examples/simulation_estimation.R (from the package root)
+Requires: devtools, Matrix, spGARCH (loaded via devtools::load_all)
+
+================================================================================
+11. FUNCTION INDEX — QUICK REFERENCE
+================================================================================
+
+R Functions:
+  sim.spARCH()           R/Simulations.R:9       — simulate spatial ARCH
+  sim.spARCH_batch()     R/Simulations.R:109     — batch simulation
+  sim.spGARCH()          R/Simulations.R:134     — simulate spatial GARCH
+  sim.spGARCH_batch()    R/Simulations.R:249     — batch simulation
+  sim.stARCH()           R/Simulations.R:453     — simulate spatiotemporal ARCH
+  sim.stGARCH()          R/Simulations.R:505     — simulate spatiotemporal GARCH
+  .choose_functions()    R/Simulations.R:280     — closure factory for spGARCH types
+
+  qml.spARCH()           R/Estimation.R:9        — QML for spARCH
+  qml.spGARCH()          R/Estimation.R:200      — QML for spGARCH
+  qml.SARspARCH()        R/Estimation.R:377      — QML for SAR-spARCH
+  nlse.spGARCH()         R/Estimation.R:1050     — NLSE for spGARCH
+  gmm.stARCH()           R/Estimation.R:1187     — GMM for stARCH
+
+  summary.spARCH()       R/Estimation.R:644      — summary for spARCH objects
+  print.spARCH()         R/Estimation.R:702
+  print.summary.spARCH() R/Estimation.R:709
+  logLik.spARCH()        R/Estimation.R:765
+  extractAIC.spARCH()    R/Estimation.R:776
+  fitted.spARCH()        R/Estimation.R:784
+  residuals.spARCH()     R/Estimation.R:788
+  plot.spARCH()          R/Estimation.R:792
+
+  .LL_unified()          R/Estimation.R:973      — unified LL for qml.spGARCH
+  .teststart()           R/Estimation.R:895      — validate starting values
+  .ord()                 R/Estimation.R:949      — ordinal suffixes
+
+C++ Functions (src/):
+  .Simulation_CPP           Simulations.cpp:5    — simulate spARCH h
+  .Simulation_CPP_LOG       Simulations.cpp:27   — simulate log-spARCH Y
+  .Simulation_CPP_E         Simulations.cpp:49   — simulate E-spARCH Y
+  .Simulation_spGARCH_CPP   Simulations.cpp:60   — simulate spGARCH X (latent)
+  .d_h_d_eps_CPP            Simulations.cpp:80   — Jacobian dh/deps (spGARCH)
+  .asdgCMatrix              Simulations.cpp:123  — dense→sparse coercion
+
+  .LL_spARCH                Estimation.cpp:22    — spARCH LL, no X
+  .LL_EspARCH               Estimation.cpp:66    — log-spARCH LL, no X
+  .LL_spARCHX               Estimation.cpp:120   — spARCH LL, +X
+  .LL_EspARCHX              Estimation.cpp:172   — log-spARCH LL, +X
+  .LL_SARspARCH             Estimation.cpp:249   — SAR+spARCH LL, no X
+  .LL_SARspARCHX            Estimation.cpp:363   — SAR+spARCH LL, +X
+  .LL_SAREspARCH            Estimation.cpp:299   — SAR+log-spARCH LL, no X
+  .LL_SAREspARCHX           Estimation.cpp:423   — SAR+log-spARCH LL, +X
+  .NLSE_spGARCH             Estimation.cpp:486   — NLSE objective
+  .GMM_stARCH_CPP           Estimation.cpp:525   — GMM objective for stARCH
+
+================================================================================
+12. DEBUGGING AND TESTING NOTES
+================================================================================
+
+12.1  To test if the package loads:
+  devtools::load_all(".")
+  Or: R CMD INSTALL . && library(spGARCH)
+
+12.2  To trace a C++ call from R:
+  Rcpp::sourceCpp("src/Simulations.cpp")  — recompile
+  debugonce(.LL_spARCH)                   — set R breakpoint
+  The C++ side can be debugged with gdb/lldb if compiled with -g
+
+12.3  Common failure modes:
+  - "Matrix M is singular" → eps too extreme, try triangular=TRUE or
+    reduce rho/lambda
+  - "Iterative maximization did not converge" → bad starting values,
+    try different start, check parameter bounds
+  - "Hessian matrix is computationally singular" → identification issue,
+    parameters may be collinear (common with large rho+lambda)
+  - gmm.stARCH returning NA → double-demeaning makes data degenerate
+    with small n; try larger n
+
+12.4  Numerical stability for large n:
+  - eigenvalue computation O(n^3) is the bottleneck
+  - For n > 500, consider using the NLSE method instead of QML
+  - The GMM method (stARCH) scales well with T but still does
+    matrix operations O(n^3) for the quadratic moment condition
+
+================================================================================
+END OF DOCUMENT
+================================================================================
