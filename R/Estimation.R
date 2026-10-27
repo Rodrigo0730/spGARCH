@@ -197,9 +197,6 @@ qml.spARCH <- function(
   return(structure(out, class = c("spARCH")))
 }
 
-
-
-
 qml.spGARCH <- function(
   formula,
   W1,
@@ -265,9 +262,9 @@ qml.spGARCH <- function(
 
   functions <- .choose_functions(type)
 
-  f_inv     <- functions$f_inv
-  tau_y     <- functions$tau_y
-  g         <- functions$g
+  f_inv <- functions$f_inv
+  tau_y <- functions$tau_y
+  g <- functions$g
   d_h_d_eps <- functions$d_h_d_eps
 
   if (dim(X)[2] == 0) {
@@ -1050,9 +1047,15 @@ plot.spARCH <- function(
 #
 ##################################################
 
-nlse.spGARCH <- function(y, W1, W2, start = c(1, 0.5, 0.5), control = list()) {
-  con <- list(trace = 1, outer.iter = 400, inner.iter = 800, tol = 1.0e-8)
+nlse.spGARCH <- function(y, W1, W2, start = NULL, control = list()) {
+  con <- list(maxit = 1000, factr = 1e7, pgtol = 1e-8)
   con[names(control)] <- control
+
+  if (is.null(start)) {
+    c_constant <- -1.27036
+    alpha_start <- exp(mean(log(y^2 + 1e-12) - c_constant))
+    start <- c(alpha_start, 0.1, 0.1)
+  }
 
   if (!inherits(W1, "dgCMatrix")) {
     W1 <- .asdgCMatrix(as.matrix(W1))
@@ -1070,15 +1073,26 @@ nlse.spGARCH <- function(y, W1, W2, start = c(1, 0.5, 0.5), control = list()) {
     .NLSE_spGARCH(pars, param)
   }
 
-  opt <- solnp(pars = start, fun = obj_fun, LB = LB, UB = UB, control = con)
+  opt <- optim(
+    par = start,
+    fn = obj_fun,
+    method = "L-BFGS-B",
+    lower = LB,
+    upper = UB,
+    control = con
+  )
 
   if (opt$convergence != 0) {
-    warning("Iterative minimization did not converge.\n")
+    warning(
+      "Iterative minimization did not converge (optim status: ",
+      opt$convergence,
+      ").\n"
+    )
   }
 
-  alpha_hat <- opt$pars[1]
-  rho_hat <- opt$pars[2]
-  lambda_hat <- opt$pars[3]
+  alpha_hat <- opt$par[1]
+  rho_hat <- opt$par[2]
+  lambda_hat <- opt$par[3]
 
   n <- length(y)
   M <- Matrix::Diagonal(n) - lambda_hat * W2
