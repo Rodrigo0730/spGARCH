@@ -42,23 +42,22 @@ double LL_spARCH(Eigen::VectorXd pars, List param) {
   VectorXd                h = alpha * VectorXd::Ones(n) + rho * Wsparse * y.asDiagonal() * y;
   ArrayXd               eps = y.array() / (h.array()).sqrt();
 
-  ArrayXd               aux = h.array() / pow(y.array(), 2);
-  MatrixXd             aux2 = (aux.matrix()).asDiagonal();
-  MatrixXd             rhoW = rho * Wsparse;
+  MatrixXd I = MatrixXd::Identity(n, n);
+  MatrixXd eps_diag = eps.matrix().asDiagonal();
+  MatrixXd M_stable = I - rho * eps_diag * MatrixXd(Wsparse.transpose()) * eps_diag;
 
+// 2. Solve for eigenvalues of the stable matrix
   VectorXd eigen_v(n);
-  if(sym)
-  {
-    SelfAdjointEigenSolver<MatrixXd>       es(aux2 - rhoW.transpose());
-                                 eigen_v = es.eigenvalues();
-  }
-  else
-  {
-    EigenSolver<MatrixXd>       es(aux2 - rhoW.transpose());
-                      eigen_v = es.eigenvalues().real();
+  if(sym) {
+      SelfAdjointEigenSolver<MatrixXd> es(M_stable);
+      eigen_v = es.eigenvalues();
+  } else {
+      EigenSolver<MatrixXd> es(M_stable);
+      eigen_v = es.eigenvalues().real();
   }
 
-  double log_abs_det_partial = ( (pow(y.array(), 2) / (pow(h.array(), 3)).sqrt()).log() + ((eigen_v.array()).abs()).log()).sum();
+  // 3. Compute log-abs-determinant: -0.5 * sum(log(h_i)) + sum(log(|eigenvalue_i|))
+  double log_abs_det_partial = -0.5 * (h.array().log()).sum() + ((eigen_v.array()).abs().log()).sum();
   double sum_f_residuals     = - 0.5 * log(2 * pi) - 0.5 * (pow(eps.array(), 2)).sum();
 
   return  (-1) * (sum_f_residuals + log_abs_det_partial);
