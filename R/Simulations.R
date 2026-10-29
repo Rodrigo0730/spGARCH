@@ -458,9 +458,10 @@ sim.stARCH <- function(
   delta,
   alpha,
   W,
-  control = list()
+  control = list(),
+  seed = NULL
 ) {
-  con <- list(seed = NULL, burnin = 50)
+  con <- list(seed = seed, burnin = 50)
   con[names(control)] <- control
 
   if (!is.null(con$seed)) {
@@ -481,7 +482,7 @@ sim.stARCH <- function(
 
   I_n <- Matrix::Diagonal(n)
   A <- I_n - rho * W
-
+  A_lu <- Matrix::lu(A)
   h_star[, 1] <- alpha
   Y[, 1] <- exp(h_star[, 1] / 2) * eps[, 1]
   log_Y2[, 1] <- log_eps2[, 1] + h_star[, 1]
@@ -492,7 +493,7 @@ sim.stARCH <- function(
       gamma * log_Y2[, t - 1] +
       delta * (W %*% log_Y2[, t - 1])
 
-    h_star[, t] <- as.numeric(Matrix::solve(A, rhs))
+    h_star[, t] <- as.numeric(Matrix::solve(A_lu, rhs))
     Y[, t] <- exp(h_star[, t] / 2) * eps[, t]
     log_Y2[, t] <- h_star[, t] + log_eps2[, t]
   }
@@ -511,9 +512,10 @@ sim.stGARCH <- function(
   beta,
   alpha,
   W,
-  control = list()
+  control = list(),
+  seed = NULL
 ) {
-  con <- list(seed = NULL, burnin = 50)
+  con <- list(seed = seed, burnin = 50)
   con[names(control)] <- control
 
   if (!is.null(con$seed)) {
@@ -549,6 +551,95 @@ sim.stGARCH <- function(
     h_star[, t] <- as.numeric(Matrix::solve(A, rhs))
     Y[, t] <- exp(h_star[, t] / 2) * eps[, t]
     log_Y2[, t] <- h_star[, t] + log_eps2[, t]
+  }
+
+  Y_out <- Y[, (con$burnin + 1):Total_T]
+  return(Y_out)
+}
+
+
+##################################################
+#
+# Simulation of spatiotemporal stochastic volatility
+# (spatial econometrics approach)
+#
+##################################################
+
+sim.stSV <- function(
+  n = nrow(W),
+  TT,
+  rho1,
+  rho2,
+  rho3,
+  sigma2,
+  W,
+  mu = 0,
+  control = list(),
+  seed = NULL,
+  model_type = c("classic", "MESS")
+) {
+  model_type <- match.arg(model_type)
+
+  con <- list(seed = seed, burnin = 50)
+  con[names(control)] <- control
+
+  if (!is.null(con$seed)) {
+    set.seed(con$seed)
+  }
+  if (!inherits(W, "dgCMatrix")) {
+    W <- methods::as(W, "dgCMatrix")
+  }
+  if (length(mu) == 1) {
+    mu <- rep(mu, n)
+  }
+
+  Total_T <- TT + con$burnin
+
+  V <- matrix(rnorm(n * Total_T), nrow = n, ncol = Total_T)
+  U <- matrix(rnorm(n * Total_T, mean = 0, sd = sqrt(sigma2)), nrow = n, ncol = Total_T)
+
+  I_n <- Matrix::Diagonal(n)
+
+  h <- matrix(0, nrow = n, ncol = Total_T)
+  Y <- matrix(0, nrow = n, ncol = Total_T)
+
+  z <- rep(0, n)
+
+  if (model_type == "classic") {
+    if (abs(rho1) >= 1) {
+      stop("|rho1| must be < 1 so that (I - rho1*W) is invertible.")
+    }
+
+    S <- I_n - rho1 * W
+    A <- rho2 * I_n + rho3 * W
+
+    B <- as.matrix(Matrix::solve(S, A))
+    if (max(Mod(eigen(B, only.values = TRUE)$values)) >= 1) {
+      stop("Unstable: spectral radius of (I - rho1*W)^{-1} (rho2*I + rho3*W) is >= 1.")
+    }
+
+    S_lu <- Matrix::lu(S)
+
+    for (t in 1:Total_T) {
+      rhs <- as.numeric(A %*% z) + U[, t]
+      z <- as.numeric(Matrix::solve(S_lu, rhs))
+      h[, t] <- mu + z
+      Y[, t] <- exp(h[, t] / 2) * V[, t]
+    }
+  } else {
+    E1 <- as.matrix(Matrix::expm(Matrix::Matrix(-rho1 * as.matrix(W))))
+    E3 <- as.matrix(Matrix::expm(Matrix::Matrix(rho3 * as.matrix(W))))
+    T_mat <- E1 %*% ((rho2 + 1) * I_n - E3)
+
+    if (max(Mod(eigen(T_mat, only.values = TRUE)$values)) >= 1) {
+      stop("Unstable: spectral radius of e^{-rho1*W} ((rho2 + 1) I - e^{rho3*W}) is >= 1.")
+    }
+
+    for (t in 1:Total_T) {
+      z <- as.numeric(T_mat %*% z) + as.numeric(E1 %*% U[, t])
+      h[, t] <- mu + z
+      Y[, t] <- exp(h[, t] / 2) * V[, t]
+    }
   }
 
   Y_out <- Y[, (con$burnin + 1):Total_T]
