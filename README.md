@@ -11,6 +11,7 @@ R/C++ package for spatial and spatiotemporal ARCH/GARCH models. It builds on Phi
 | `sim.spGARCH()` | `spGARCH`, `log-spGARCH`, `e-spGARCH`, `h-spGARCH`, `complex-spGARCH` | Analytical solve for e-spGARCH; O(nnz) input checks |
 | `sim.spARCH_batch()`, `sim.spGARCH_batch()` | same as above | `n_sim` replications, parallel via `foreach`/`doRNG` with reproducible seeds |
 | `sim.stARCH()`, `sim.stGARCH()` | spatiotemporal ARCH/GARCH | `control$burnin` defaults to 50 |
+| `sim.stSV()` | spatiotemporal stochastic volatility, `classic` or `MESS` | Stationarity check on the transition matrix; `control$burnin` defaults to 50 |
 
 ### Estimation (`R/Estimation.R`, `src/Estimation.cpp`)
 | Function | Method | Notes |
@@ -33,7 +34,7 @@ Data: `LondonCrime`, `LondonCrimeRate`, `LondonMap`, `prostate_cancer`.
 ## Layout
 ```
 R/, src/, man/, data/, inst/   package sources
-tests/testthat/                test-simulations.R (interface), test-backend.R (C++ vs model equations)
+tests/testthat/                test-simulations.R (interface), test-backend.R (C++ vs model equations), test-spatiotemporal.R
 examples/                      simulation_estimation.R (end-to-end workflow), London crime Rmds
 dev/                           implementation_guide.txt (models, call chains, known issues), literature.md
 ```
